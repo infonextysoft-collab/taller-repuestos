@@ -1,0 +1,70 @@
+# Publica la version web en GitHub Pages en cada push a main.
+#
+# Antes de publicar corre `analyze` y `test`: si algo esta roto, no se sube. Ya
+# paso una vez que todo compilaba y la pantalla salia en blanco, asi que la
+# puerta esta ahi a proposito.
+#
+# Ojo con lo que se publica: la web es una **vista previa**, no el destino. La
+# camara y el escaner necesitan el celular, y los datos son del navegador de
+# cada visitante. Sirve para mostrar la app, no para trabajar con ella.
+name: Publicar en Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Si se empujan dos commits seguidos, se publica el ultimo y se cancela el
+# anterior: no tiene sentido desplegar una version que ya quedo vieja.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+
+      # Los tests de la capa de datos abren SQLite de verdad, no un simulacro.
+      - run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
+      - run: flutter pub get
+
+      # Deja sqlite3.wasm y el worker en web/. No estan versionados porque van
+      # atados a la version del paquete, asi que se generan aca.
+      - run: dart run sqflite_common_ffi_web:setup
+
+      - run: flutter analyze
+      - run: flutter test
+
+      # El sitio vive en un subdirectorio del dominio de GitHub, asi que la
+      # base tiene que decirlo o los assets se buscan en la raiz y no cargan.
+      - run: >-
+          flutter build web --release --no-tree-shake-icons
+          --base-href /taller-repuestos/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.desplegar.outputs.page_url }}
+    steps:
+      - id: desplegar
+        uses: actions/deploy-pages@v4
