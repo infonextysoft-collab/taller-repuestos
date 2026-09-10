@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ms-web",
+      "runtimeExecutable": "C:/SDK/flutter/bin/flutter.bat",
+      "runtimeArgs": ["run", "-d", "web-server", "--web-port=5599"],
+      "port": 5599,
+      "url": "http://localhost:5599"
+    }
+  ]
+}

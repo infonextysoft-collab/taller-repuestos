@@ -1,0 +1,58 @@
+name: taller_repuestos
+description: "MS â€” registro de trabajos, repuestos y documentos para taller."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Estado
+  flutter_riverpod: ^2.6.1
+
+  # Persistencia local
+  sqflite: ^2.4.1
+  # La API pura, sin motor: es lo que usan los repos, y lo Ãºnico que se
+  # puede importar desde cÃ³digo que tambiÃ©n compila para web.
+  sqflite_common: ^2.5.5
+  sqflite_common_ffi: ^2.3.4
+  # Solo para poder probar la app en el navegador (SQLite en wasm).
+  sqflite_common_ffi_web: ^1.1.2
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.3
+
+  # Formato
+  intl: ^0.20.2
+
+  # Documentos
+  pdf: ^3.11.1
+  printing: ^5.13.4
+
+  # CÃ¡mara
+  image_picker: ^1.1.2
+  flutter_image_compress: ^2.3.0
+  mobile_scanner: ^6.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/img/logo.png
+
+  # Archivo variable: un solo archivo cubre todos los pesos y anchos que usa
+  # la app. Los ejes se piden desde `Tipo`, con FontVariation.
+  fonts:
+    - family: Archivo
+      fonts:
+        - asset: assets/fonts/Archivo.ttf

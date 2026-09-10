@@ -1,0 +1,9 @@
+# Las capturas de pantalla no corren en la suite normal: son PNG y dependen de
+# la maquina que los genero (fuentes del sistema, version del motor), asi que
+# fallarian en cualquier otro equipo por diferencias de un pixel.
+#
+# Para regenerarlas y mirarlas:
+#   flutter test test/capturas_test.dart --run-skipped --update-goldens
+tags:
+  capturas:
+    skip: "A mano: flutter test test/capturas_test.dart --run-skipped --update-goldens"
