@@ -12,6 +12,7 @@ import '../../../core/widgets/contenido.dart';
 import '../../../core/widgets/pulsable.dart';
 import '../../../core/widgets/resumen_totales.dart';
 import '../../../core/widgets/tabla_items.dart';
+import '../../../domain/entities/foto.dart';
 import '../../../domain/entities/repeticion.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../comunes/agregar_mano_obra.dart';
@@ -305,8 +306,8 @@ class _Fotos extends StatelessWidget {
 
   final String titulo;
   final String detalle;
-  final List<String> fotos;
-  final ValueChanged<List<String>> onCambio;
+  final List<Foto> fotos;
+  final ValueChanged<List<Foto>> onCambio;
   final bool bloqueado;
   final bool secundario;
 

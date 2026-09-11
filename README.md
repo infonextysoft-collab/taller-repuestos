@@ -64,11 +64,37 @@ ahí se decide qué implementación concreta cumple cada contrato.
   registro; salir sin guardar restaura el inventario al estado que tenía.
 - **Las fechas son ISO corto sin hora ni zona horaria.** Hoy todavía no está
   vencido.
+- **La sesión dura el día.** Se guarda la fecha en que se entró y al cambiar el
+  día deja de valer, así que se pide la contraseña una vez por jornada. Se
+  revisa al volver del segundo plano y no con un cronómetro: un cronómetro te
+  echa a media tarde, con el equipo abierto y las manos sucias.
+- **Las fotos viven en su propia tabla, con los bytes crudos.** Antes iban
+  dentro del registro convertidas a texto (base64), un formato que infla
+  cualquier archivo un 33%. Además el historial ya no las carga: pide solo una
+  versión chica de ~8 KB, en vez de traer el JPEG completo de cada registro
+  para dibujar una fila de 50 píxeles.
 - **Los recordatorios se repiten con un intervalo libre** (N días, semanas,
   meses o años) y la cuenta se hace **en la unidad elegida**: "cada 3 meses"
   desde un 31 de enero cae el 30 de abril, no noventa días después.
 
 Todo eso está cubierto por tests: `flutter test`.
+
+## El respaldo
+
+La app guarda todo en el dispositivo, así que **si el teléfono se pierde no hay
+de dónde recuperar nada**. El respaldo es lo que tapa ese agujero sin servidor,
+sin cuenta y sin costo: desde el menú de arriba, "Respaldo" arma un ZIP con todo
+—registros, inventario, recordatorios y fotos— y abre la hoja de compartir para
+guardarlo en Drive, el correo o WhatsApp. En un teléfono nuevo se importa y
+sigue como estaba.
+
+Adentro del ZIP van `datos.json` con las filas de cada tabla y `fotos/<id>.jpg`
+con las imágenes en crudo. Es ZIP y no una copia de la base porque se puede
+abrir y mirar: si algo sale mal, los datos se rescatan con el explorador de
+archivos y sin esta app.
+
+**Restaurar reemplaza, no mezcla.** Fusionar dos historiales con correlativos
+propios dejaría códigos repetidos en los documentos.
 
 ## La tarjeta de arriba del Historial
 
@@ -155,7 +181,10 @@ rechaza y SQLite nunca arranca.
 
 ## Pendiente, fuera de alcance por ahora
 
-- Backup en la nube.
+- **Respaldo automático en la nube.** Hoy el respaldo es manual, y depende de
+  que alguien se acuerde de hacerlo. Firebase Authentication entra en el plan
+  gratis, pero **Cloud Storage ya exige plan Blaze** (con tarjeta), así que la
+  subida automática de las fotos quedó pendiente de esa decisión.
 - **El APK de Android nunca se llegó a compilar hasta el final**: el build se
   cortó a los 40 minutos. La app corre en el navegador y las pantallas están
   verificadas con los retratos, pero el paquete de Android está sin probar.

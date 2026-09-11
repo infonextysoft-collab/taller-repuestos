@@ -7,7 +7,7 @@ import '../../app/providers.dart';
 import '../../core/theme/movimiento.dart';
 import '../../core/theme/tipografia.dart';
 import '../../core/theme/tokens.dart';
-import '../../core/utils/imagenes.dart';
+import '../../domain/entities/foto.dart';
 import '../../core/widgets/pulsable.dart';
 
 /// Las fotos de un paso: dos botones grandes arriba y una grilla debajo.
@@ -23,8 +23,8 @@ class GaleriaFotos extends ConsumerStatefulWidget {
     this.bloqueado = false,
   });
 
-  final List<String> fotos;
-  final ValueChanged<List<String>> onCambio;
+  final List<Foto> fotos;
+  final ValueChanged<List<Foto>> onCambio;
   final bool bloqueado;
 
   @override
@@ -60,7 +60,6 @@ class _GaleriaFotosState extends ConsumerState<GaleriaFotos> {
           Row(
             children: [
               Expanded(
-                flex: 2,
                 child: FilledButton.icon(
                   onPressed:
                       _trabajando ? null : () => _agregar(conCamara: true),
@@ -78,12 +77,26 @@ class _GaleriaFotosState extends ConsumerState<GaleriaFotos> {
                 ),
               ),
               const SizedBox(width: Espacio.md),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed:
-                      _trabajando ? null : () => _agregar(conCamara: false),
-                  icon: const Icon(Icons.add_photo_alternate_rounded, size: 20),
-                  label: const Text('Subir'),
+              // Solo el ícono, sin la palabra "Subir": el botón quedaba tan
+              // angosto que la partía en dos renglones ("Subi/r") y se veía
+              // roto. El ícono de foto con un "+" ya se entiende solo, y así
+              // "Tomar foto" —que es lo que se toca nueve de cada diez veces—
+              // se queda con todo el ancho.
+              Tooltip(
+                message: 'Subir una foto de la galería',
+                child: SizedBox(
+                  width: 62,
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed:
+                        _trabajando ? null : () => _agregar(conCamara: false),
+                    style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                    child: const Icon(
+                      Icons.add_photo_alternate_rounded,
+                      size: 22,
+                      semanticLabel: 'Subir una foto de la galería',
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -118,9 +131,9 @@ class _GaleriaFotosState extends ConsumerState<GaleriaFotos> {
     );
   }
 
-  void _verGrande(BuildContext context, String foto) {
-    final bytes = bytesDeFoto(foto);
-    if (bytes == null) return;
+  void _verGrande(BuildContext context, Foto foto) {
+    final bytes = foto.bytes;
+    if (bytes.isEmpty) return;
 
     showDialog<void>(
       context: context,
@@ -146,13 +159,14 @@ class _GaleriaFotosState extends ConsumerState<GaleriaFotos> {
 class _Miniatura extends StatelessWidget {
   const _Miniatura({required this.foto, required this.onVer, this.onQuitar});
 
-  final String foto;
+  final Foto foto;
   final VoidCallback onVer;
   final VoidCallback? onQuitar;
 
   @override
   Widget build(BuildContext context) {
-    final Uint8List? bytes = bytesDeFoto(foto);
+    // En la grilla alcanza con la version chica; la completa se abre al tocar.
+    final Uint8List? bytes = foto.paraLista.isEmpty ? null : foto.paraLista;
 
     return EntradaSuave(
       desplazamiento: 6,

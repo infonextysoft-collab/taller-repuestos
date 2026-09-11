@@ -54,3 +54,10 @@ app.*.map.json
 
 # El servidor estatico de desarrollo no necesita compartirse.
 .dev/__pycache__/
+
+# Configuracion de Firebase. No es una contrasena, pero identifica el proyecto
+# y este repo es publico: se guarda aparte y cada quien pone la suya.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist
+/macos/Runner/GoogleService-Info.plist
+lib/firebase_options.dart

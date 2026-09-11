@@ -1,14 +1,20 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 
+import '../../core/utils/fechas.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../local/app_database.dart';
 
-/// Credenciales en SQLite; la sesión abierta, en preferencias.
+/// Credenciales en SQLite; el día de la sesión, en preferencias.
 class AuthRepositorySqlite implements AuthRepository {
   AuthRepositorySqlite(this._base);
 
-  static const String _claveSesion = 'sesion_abierta';
+  /// Guarda la **fecha** en que se entró, no un sí/no.
+  ///
+  /// Es una clave nueva: la vieja guardaba un booleano y leerla como texto
+  /// reventaría. Al entrar la primera vez se limpia sola.
+  static const String _claveSesion = 'sesion_dia';
+  static const String _claveSesionVieja = 'sesion_abierta';
 
   final AppDatabase _base;
   Database get _db => _base.db;
@@ -62,18 +68,19 @@ class AuthRepositorySqlite implements AuthRepository {
   @override
   Future<bool> haySesion() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_claveSesion) ?? false;
+    return prefs.getString(_claveSesion) == hoyISO();
   }
 
   @override
   Future<void> abrirSesion() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_claveSesion, true);
+    await prefs.remove(_claveSesionVieja);
+    await prefs.setString(_claveSesion, hoyISO());
   }
 
   @override
   Future<void> cerrarSesion() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_claveSesion, false);
+    await prefs.remove(_claveSesion);
   }
 }

@@ -400,7 +400,7 @@ class _FilaHistorial extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Miniatura(foto: t.fotosIngreso.firstOrNull, nombre: cliente),
+          Miniatura(foto: t.miniatura, nombre: cliente),
           const SizedBox(width: Espacio.md),
           // El nombre manda en la primera línea y el importe la cierra; lo
           // demás baja a la segunda. Cuando todo iba en un renglón, el nombre

@@ -6,7 +6,7 @@ import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
 
 /// Qué se eligió en el menú del negocio.
-enum AccionNegocio { datos, clave, salir }
+enum AccionNegocio { datos, respaldo, clave, salir }
 
 /// La barra de arriba.
 ///
@@ -115,6 +115,8 @@ class _MenuNegocio extends StatelessWidget {
         itemBuilder: (context) => [
           _item(AccionNegocio.datos, Icons.storefront_rounded,
               'Datos del negocio', 'Lo que sale impreso en el documento'),
+          _item(AccionNegocio.respaldo, Icons.save_alt_rounded, 'Respaldo',
+              'Guardar todo por si pierdes el teléfono'),
           _item(AccionNegocio.clave, Icons.lock_outline_rounded,
               'Cambiar contraseña', null),
           const PopupMenuDivider(color: Tono.negroLinea, height: Espacio.md),

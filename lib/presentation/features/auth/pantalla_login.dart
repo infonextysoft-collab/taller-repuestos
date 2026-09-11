@@ -35,19 +35,7 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
 
   bool _verClave = false;
   bool _entrando = false;
-  bool _claveDeFabrica = false;
   String? _errorAcceso;
-
-  @override
-  void initState() {
-    super.initState();
-    _revisarClaveInicial();
-  }
-
-  Future<void> _revisarClaveInicial() async {
-    final inicial = await ref.read(authRepoProvider).esClaveInicial();
-    if (mounted) setState(() => _claveDeFabrica = inicial);
-  }
 
   @override
   void dispose() {
@@ -169,30 +157,6 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                                   )
                                 : const Text('Entrar'),
                           ),
-                          if (_claveDeFabrica) ...[
-                            const SizedBox(height: Espacio.xl),
-                            Panel(
-                              color: Tono.oroSuave,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'PRIMER INGRESO',
-                                    style: Tipo.etiqueta
-                                        .copyWith(color: Tono.oroTexto),
-                                  ),
-                                  const SizedBox(height: Espacio.sm),
-                                  Text(
-                                    'Usuario $usuarioInicial, contraseña '
-                                    '$claveInicial. Cámbiala desde el menú de '
-                                    'arriba.',
-                                    style: Tipo.secundario
-                                        .copyWith(color: Tono.oroTexto),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),

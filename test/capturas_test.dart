@@ -25,6 +25,7 @@ import 'package:taller_repuestos/domain/entities/trabajo.dart';
 import 'package:taller_repuestos/presentation/features/apertura/pantalla_apertura.dart';
 import 'package:taller_repuestos/presentation/features/auth/pantalla_login.dart';
 import 'package:taller_repuestos/presentation/features/negocio/pantalla_negocio.dart';
+import 'package:taller_repuestos/presentation/features/negocio/pantalla_respaldo.dart';
 import 'package:taller_repuestos/presentation/features/shell/shell_principal.dart';
 import 'package:taller_repuestos/presentation/features/trabajo/wizard_trabajo.dart';
 
@@ -152,6 +153,31 @@ void main() {
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('capturas/6-wizard-cobro.png'),
+    );
+  });
+
+  testWidgets('wizard paso 2, las dos tandas de fotos', (tester) async {
+    await _mostrar(tester, WizardTrabajo(id: pendienteId));
+    // Abre en el paso 4; dos pasos atrás para llegar a las fotos.
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byIcon(Icons.arrow_back_rounded).last);
+      await _asentar(tester);
+    }
+    // El paso viene cerrado porque ya se guardo: se reabre para ver los
+    // botones de camara y galeria.
+    await tester.tap(find.text('Editar'));
+    await _asentar(tester);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/12-wizard-fotos.png'),
+    );
+  });
+
+  testWidgets('respaldo', (tester) async {
+    await _mostrar(tester, const PantallaRespaldo());
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/13-respaldo.png'),
     );
   });
 

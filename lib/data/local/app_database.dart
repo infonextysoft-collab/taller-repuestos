@@ -1,3 +1,9 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
+import '../../core/utils/imagenes.dart';
+import '../../domain/entities/foto.dart';
 import 'fabrica_db.dart';
 
 /// Credenciales iniciales. Se cambian desde la app, en Datos del negocio, no
@@ -53,7 +59,10 @@ class AppDatabase {
 
   /// 1 → 2: los recordatorios pasaron de "cada N meses" a un intervalo libre
   /// (N días / semanas / meses / años) y ganaron la marca de importante.
-  static const int _version = 2;
+  ///
+  /// 2 → 3: las fotos salieron de adentro del registro y pasaron a su propia
+  /// tabla, con los bytes crudos en vez de texto base64.
+  static const int _version = 3;
 
   /// Las columnas viejas `recordatorioMeses` y `repetirMeses` **quedan**: son
   /// de dónde lee el intervalo cualquier registro guardado antes de esto, y
@@ -75,6 +84,67 @@ class AppDatabase {
         await d.execute(sentencia);
       }
     }
+
+    if (desde < 3) {
+      await d.execute(_tablaFotos);
+      await d.execute(_indiceFotos);
+      await _mudarFotos(d);
+    }
+  }
+
+  /// Saca las fotos de adentro de `trabajos` y las pasa a su tabla.
+  ///
+  /// Las viejas están como una lista JSON de data URIs. Se decodifican una por
+  /// una y se guardan en crudo. Una foto ilegible se descarta en silencio: es
+  /// preferible perder una imagen a que la app no abra nunca más.
+  @visibleForTesting
+  static Future<void> mudarFotos(Database d) => _mudarFotos(d);
+
+  static Future<void> _mudarFotos(Database d) async {
+    final filas = await d.query(
+      'trabajos',
+      columns: ['id', 'fotosIngreso', 'fotosEntrega'],
+    );
+
+    for (final fila in filas) {
+      final trabajoId = (fila['id'] as num).toInt();
+
+      for (final momento in MomentoFoto.values) {
+        final crudo = fila[
+            momento == MomentoFoto.ingreso ? 'fotosIngreso' : 'fotosEntrega'];
+        final lista = _listaDeTexto(crudo);
+
+        for (var i = 0; i < lista.length; i++) {
+          final bytes = bytesDeFoto(lista[i]);
+          if (bytes == null || bytes.isEmpty) continue;
+
+          await d.insert('fotos', {
+            'trabajoId': trabajoId,
+            'momento': momento.name,
+            'orden': i,
+            'bytes': bytes,
+          });
+        }
+      }
+
+      await d.update(
+        'trabajos',
+        {'fotosIngreso': '[]', 'fotosEntrega': '[]'},
+        where: 'id = ?',
+        whereArgs: [trabajoId],
+      );
+    }
+  }
+
+  static List<String> _listaDeTexto(Object? crudo) {
+    try {
+      final decodificado = jsonDecode((crudo ?? '[]').toString());
+      return decodificado is List
+          ? decodificado.map((e) => e.toString()).toList()
+          : const [];
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<void> _crear(Database d, int version) async {
@@ -82,6 +152,25 @@ class AppDatabase {
       await d.execute(sentencia);
     }
   }
+
+  /// Las fotos, aparte del registro. Ver [Foto] para el porqué.
+  ///
+  /// `remota` queda desde ya, vacía: es donde va a anotarse la dirección en la
+  /// nube cuando exista el respaldo, y agregarla ahora evita otra migración.
+  static const String _tablaFotos = '''
+    CREATE TABLE fotos (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      trabajoId INTEGER NOT NULL,
+      momento   TEXT    NOT NULL,
+      orden     INTEGER NOT NULL DEFAULT 0,
+      bytes     BLOB    NOT NULL,
+      mini      BLOB,
+      remota    TEXT
+    )
+  ''';
+
+  static const String _indiceFotos =
+      'CREATE INDEX ix_fotos_trabajo ON fotos(trabajoId, momento, orden)';
 
   /// El esquema, en el orden en que se crea.
   ///
@@ -158,6 +247,8 @@ class AppDatabase {
     'CREATE INDEX ix_rec_fecha   ON recordatorios(fecha)',
     'CREATE INDEX ix_rec_estado  ON recordatorios(estado)',
     'CREATE INDEX ix_rec_trabajo ON recordatorios(trabajoId)',
+    _tablaFotos,
+    _indiceFotos,
     '''
       CREATE TABLE negocio (
         id        INTEGER PRIMARY KEY,

@@ -26,7 +26,13 @@ abstract class AuthRepository {
   /// ¿Sigue con la clave de fábrica? Solo para el aviso de primer ingreso.
   Future<bool> esClaveInicial();
 
-  /// ¿Hay una sesión abierta de una vez anterior?
+  /// ¿Hay una sesión abierta **de hoy**?
+  ///
+  /// La sesión dura el día: se guarda la fecha en que se entró, y al cambiar
+  /// el día deja de valer. Se eligió así en vez de un cronómetro porque un
+  /// cronómetro te echa a media tarde, con las manos sucias y el equipo
+  /// abierto; esto pide la contraseña una vez por día y nunca en el medio de
+  /// un trabajo.
   Future<bool> haySesion();
 
   Future<void> abrirSesion();

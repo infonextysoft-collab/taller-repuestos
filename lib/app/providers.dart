@@ -8,12 +8,14 @@ import '../data/repositories/inventario_repository_sqlite.dart';
 import '../data/repositories/negocio_repository_sqlite.dart';
 import '../data/repositories/recordatorios_repository_sqlite.dart';
 import '../data/repositories/trabajos_repository_sqlite.dart';
+import '../data/respaldo/respaldo_zip.dart';
 import '../domain/entities/negocio.dart';
 import '../domain/entities/resumen_taller.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/inventario_repository.dart';
 import '../domain/repositories/negocio_repository.dart';
 import '../domain/repositories/recordatorios_repository.dart';
+import '../domain/repositories/respaldo_repository.dart';
 import '../domain/repositories/trabajos_repository.dart';
 
 /// El cableado de la app: qué implementación concreta usa cada contrato.
@@ -44,6 +46,10 @@ final recordatoriosRepoProvider = Provider<RecordatoriosRepository>(
 
 final negocioRepoProvider = Provider<NegocioRepository>(
   (ref) => NegocioRepositorySqlite(ref.watch(baseDatosProvider)),
+);
+
+final respaldoRepoProvider = Provider<RespaldoRepository>(
+  (ref) => RespaldoZip(ref.watch(baseDatosProvider)),
 );
 
 final authRepoProvider = Provider<AuthRepository>(

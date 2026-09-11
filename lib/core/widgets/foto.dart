@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'dart:typed_data';
+
 import '../theme/tipografia.dart';
 import '../theme/tokens.dart';
-import '../utils/imagenes.dart';
 
 /// La cara de un registro en una lista.
 ///
@@ -18,13 +19,15 @@ class Miniatura extends StatelessWidget {
     this.lado = 50,
   });
 
-  final String? foto;
+  /// Los bytes ya listos. Llegan resueltos de afuera —del listado, que pide
+  /// solo la versión chica— y no se decodifica nada acá adentro.
+  final Uint8List? foto;
   final String nombre;
   final double lado;
 
   @override
   Widget build(BuildContext context) {
-    final bytes = bytesDeFoto(foto);
+    final bytes = (foto?.isEmpty ?? true) ? null : foto;
 
     return ClipRRect(
       borderRadius: Redondeo.brChico,

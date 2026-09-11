@@ -13,15 +13,42 @@ import 'providers.dart';
 enum _Fase { apertura, login, dentro }
 
 /// La app. Solo decide qué hay en la raíz; todo lo demás vive en su feature.
-class AppMs extends StatefulWidget {
+class AppMs extends ConsumerStatefulWidget {
   const AppMs({super.key});
 
   @override
-  State<AppMs> createState() => _AppMsState();
+  ConsumerState<AppMs> createState() => _AppMsState();
 }
 
-class _AppMsState extends State<AppMs> {
+class _AppMsState extends ConsumerState<AppMs> with WidgetsBindingObserver {
   _Fase _fase = _Fase.apertura;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// La sesión dura el día, y el día cambia mientras la app está guardada en
+  /// segundo plano — un celular puede quedarse con la app abierta una semana.
+  ///
+  /// Se revisa **al volver al frente**, no con un temporizador: así nunca te
+  /// echa mientras estás escribiendo un registro. Si pasó la medianoche, al
+  /// retomar la app pide la contraseña otra vez.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState estado) {
+    if (estado != AppLifecycleState.resumed || _fase != _Fase.dentro) return;
+
+    ref.read(authRepoProvider).haySesion().then((sigue) {
+      if (!sigue && mounted) setState(() => _fase = _Fase.login);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

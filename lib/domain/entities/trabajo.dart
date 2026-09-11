@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'dart:typed_data';
+
+import 'foto.dart';
 import 'linea.dart';
 import 'repeticion.dart';
 import 'totales.dart';
@@ -66,6 +69,7 @@ class Trabajo {
     this.precioVuelta = 0,
     this.fotosIngreso = const [],
     this.fotosEntrega = const [],
+    this.miniatura,
     this.observaciones = '',
     this.diagnostico = '',
     this.trabajosRealizados = const [],
@@ -97,9 +101,18 @@ class Trabajo {
   final int vueltas;
   final double precioVuelta;
 
-  /// Rutas de archivo de las fotos ya comprimidas.
-  final List<String> fotosIngreso;
-  final List<String> fotosEntrega;
+  /// Las fotos del trabajo, ya comprimidas.
+  ///
+  /// Vienen llenas al **abrir** un registro. En el listado del historial
+  /// llegan vacías a propósito: cargar las fotos de cincuenta registros para
+  /// dibujar una lista es justamente lo que se quería dejar de hacer. Para esa
+  /// lista está [miniatura].
+  final List<Foto> fotosIngreso;
+  final List<Foto> fotosEntrega;
+
+  /// La primera foto, en chico, **solo en el listado**. Al abrir el registro
+  /// llega `null` porque ahí ya están las completas.
+  final Uint8List? miniatura;
 
   final String observaciones;
   final String diagnostico;
@@ -145,8 +158,9 @@ class Trabajo {
     Movilidad? movilidad,
     int? vueltas,
     double? precioVuelta,
-    List<String>? fotosIngreso,
-    List<String>? fotosEntrega,
+    List<Foto>? fotosIngreso,
+    List<Foto>? fotosEntrega,
+    Uint8List? miniatura,
     String? observaciones,
     String? diagnostico,
     List<LineaMano>? trabajosRealizados,
@@ -176,6 +190,7 @@ class Trabajo {
         precioVuelta: precioVuelta ?? this.precioVuelta,
         fotosIngreso: fotosIngreso ?? this.fotosIngreso,
         fotosEntrega: fotosEntrega ?? this.fotosEntrega,
+        miniatura: miniatura ?? this.miniatura,
         observaciones: observaciones ?? this.observaciones,
         diagnostico: diagnostico ?? this.diagnostico,
         trabajosRealizados: trabajosRealizados ?? this.trabajosRealizados,
@@ -211,8 +226,10 @@ class Trabajo {
         'vueltas': vueltas,
         'precioVuelta': precioVuelta,
         'cobraTraslado': cobraTraslado ? 1 : 0,
-        'fotosIngreso': jsonEncode(fotosIngreso),
-        'fotosEntrega': jsonEncode(fotosEntrega),
+        // Las columnas viejas quedan vacías: las fotos viven en su tabla.
+        // Se dejan en el esquema para no reescribir la tabla entera al migrar.
+        'fotosIngreso': '[]',
+        'fotosEntrega': '[]',
         'observaciones': observaciones,
         'diagnostico': diagnostico,
         'trabajosRealizados':
@@ -237,12 +254,6 @@ class Trabajo {
         .toList();
   }
 
-  static List<String> _fotos(Object? raw) {
-    if (raw == null) return const [];
-    final d = jsonDecode(raw.toString());
-    return d is List ? d.map((e) => e.toString()).toList() : const [];
-  }
-
   factory Trabajo.fromRow(Map<String, Object?> r) => Trabajo(
         id: (r['id'] as num?)?.toInt(),
         codigo: (r['codigo'] ?? '').toString(),
@@ -259,8 +270,9 @@ class Trabajo {
         movilidad: _enumDe(Movilidad.values, r['movilidad'], Movilidad.cliente),
         vueltas: (r['vueltas'] as num?)?.toInt() ?? 0,
         precioVuelta: (r['precioVuelta'] as num?)?.toDouble() ?? 0,
-        fotosIngreso: _fotos(r['fotosIngreso']),
-        fotosEntrega: _fotos(r['fotosEntrega']),
+        // Las fotos las adjunta el repositorio, que es quien sabe leer su
+        // tabla; desde una fila de `trabajos` no hay forma de alcanzarlas.
+
         observaciones: (r['observaciones'] ?? '').toString(),
         diagnostico: (r['diagnostico'] ?? '').toString(),
         trabajosRealizados: _lista(r['trabajosRealizados'], LineaMano.fromJson),

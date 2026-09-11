@@ -10,6 +10,7 @@ import '../historial/pantalla_historial.dart';
 import '../inventario/pantalla_inventario.dart';
 import '../negocio/formulario_clave.dart';
 import '../negocio/pantalla_negocio.dart';
+import '../negocio/pantalla_respaldo.dart';
 import '../recordatorios/pantalla_recordatorios.dart';
 import '../trabajo/wizard_trabajo.dart';
 import '../venta/pantalla_venta_simple.dart';
@@ -98,6 +99,11 @@ class _ShellPrincipalState extends ConsumerState<ShellPrincipal> {
       case AccionNegocio.datos:
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const PantallaNegocio()),
+        );
+
+      case AccionNegocio.respaldo:
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PantallaRespaldo()),
         );
 
       case AccionNegocio.clave:

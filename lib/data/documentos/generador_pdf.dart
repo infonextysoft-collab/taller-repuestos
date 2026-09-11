@@ -6,11 +6,11 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../core/utils/dinero.dart';
 import '../../core/utils/fechas.dart';
-import '../../core/utils/imagenes.dart';
 import '../../core/utils/letras.dart';
 import '../../domain/entities/linea.dart';
 import '../../domain/entities/negocio.dart';
 import '../../domain/entities/totales.dart';
+import '../../domain/entities/foto.dart';
 import '../../domain/entities/trabajo.dart';
 import '../../domain/services/calculadora_totales.dart';
 
@@ -101,13 +101,17 @@ class GeneradorPdf {
 
   /// Las fotos vienen guardadas como datos en el propio registro, así que el
   /// documento no depende de que exista un archivo en el disco.
-  List<pw.MemoryImage> _imagenes(List<String> fotos) {
+  List<pw.MemoryImage> _imagenes(List<Foto> fotos) {
     final imagenes = <pw.MemoryImage>[];
 
     for (final foto in fotos) {
       // Una foto ilegible no puede tumbar el documento entero.
-      final bytes = bytesDeFoto(foto);
-      if (bytes != null) imagenes.add(pw.MemoryImage(bytes));
+      if (foto.bytes.isEmpty) continue;
+      try {
+        imagenes.add(pw.MemoryImage(foto.bytes));
+      } catch (_) {
+        continue;
+      }
     }
 
     return imagenes;

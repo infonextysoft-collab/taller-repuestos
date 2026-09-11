@@ -59,7 +59,18 @@ class _WizardTrabajoState extends ConsumerState<WizardTrabajo> {
   );
 
   final _campos = CamposWizard();
-  final _form = GlobalKey<FormState>();
+
+  /// Una clave de formulario **por paso**, no una compartida.
+  ///
+  /// Mientras la transición corre, el paso que sale y el que entra están los
+  /// dos en el árbol. Con una sola clave, Flutter detectaba la misma
+  /// `GlobalKey` dos veces y desenganchaba el formulario viejo de su lugar
+  /// —un error en rojo en cada "Siguiente", y el riesgo de que el paso que se
+  /// va pierda lo que tenía cargado—.
+  final Map<int, GlobalKey<FormState>> _formularios = {};
+
+  GlobalKey<FormState> _formDe(int paso) =>
+      _formularios.putIfAbsent(paso, GlobalKey<FormState>.new);
 
   int _paso = 1;
   bool _haciaAdelante = true;
@@ -105,7 +116,7 @@ class _WizardTrabajoState extends ConsumerState<WizardTrabajo> {
   Future<void> _siguiente() async {
     // Cada paso valida lo suyo antes de dejar avanzar: descubrir en el paso 9
     // que falta el cliente del paso 1 obliga a volver ocho pantallas.
-    final formulario = _form.currentState;
+    final formulario = _formDe(_paso).currentState;
     if (formulario != null && !formulario.validate()) {
       mostrarAviso(context, 'Revisa los campos marcados.', problema: true);
       return;
@@ -236,7 +247,7 @@ class _WizardTrabajoState extends ConsumerState<WizardTrabajo> {
           indice: _paso,
           haciaAdelante: _haciaAdelante,
           child: _CuerpoPaso(
-            formKey: _form,
+            formKey: _formDe(_paso),
             paso: _paso,
             ctrl: _ctrl,
             campos: _campos,

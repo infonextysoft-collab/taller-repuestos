@@ -39,6 +39,9 @@ dependencies:
   image_picker: ^1.1.2
   flutter_image_compress: ^2.3.0
   mobile_scanner: ^6.0.2
+  archive: ^4.0.9
+  share_plus: ^13.3.0
+  file_picker: ^12.2.0
 
 dev_dependencies:
   flutter_test:
