@@ -116,3 +116,33 @@ Future<SalidaWizard> confirmarSalida(BuildContext context) async {
 
   return respuesta ?? SalidaWizard.permanecer;
 }
+
+/// Un aviso que hay que leer con calma: queda en pantalla hasta que se cierra.
+///
+/// Para lo que trae una instrucción —"revisa tu correo, y si no llega…"—. El
+/// aviso de abajo se va a los pocos segundos y eso no alcanza para leerlo.
+Future<void> informar(
+  BuildContext context, {
+  required String titulo,
+  required String mensaje,
+  String boton = 'Entendido',
+}) =>
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(titulo),
+        content: Text(mensaje),
+        actionsPadding: const EdgeInsets.fromLTRB(
+          Espacio.lg,
+          0,
+          Espacio.lg,
+          Espacio.lg,
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(boton),
+          ),
+        ],
+      ),
+    );

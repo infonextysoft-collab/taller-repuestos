@@ -7,8 +7,9 @@ mantenimiento.
 
 Tres reglas de producto que mandan sobre todo lo demás:
 
-1. **Funciona 100% sin internet.** No hay servidor ni sincronización: todos los
-   datos viven en el dispositivo.
+1. **Funciona sin internet.** No hay servidor ni sincronización: todos los
+   datos viven en el dispositivo. Lo único que usa la red es la recuperación de
+   contraseña por correo, y es opcional.
 2. **No es facturación electrónica SUNAT.** Es documentación interna; el
    contador la presenta a fin de mes.
 3. **Se usa con una mano, parado en un taller o en el campo.** Área táctil
@@ -23,22 +24,23 @@ Widget → Controlador → Repositorio (contrato) → SQLite
 
 Cada capa habla **solo** con la de al lado, y siempre hacia adentro: la
 presentación conoce los contratos de `domain/`, nunca la implementación. Esto no
-es ceremonia — el día que se agregue backup en la nube se toca `data/` y nada
-más se entera.
+es ceremonia — cuando llegó la cuenta de correo se tocó `data/` y ninguna
+pantalla de negocio se enteró.
 
 ```
 lib/
 ├── core/            transversal: tokens de diseño, movimiento, utilidades
 │   ├── theme/       colores, espacios, curvas de animación
-│   ├── utils/       funciones puras (totales, fechas, DNI/RUC, letras)
+│   ├── utils/       funciones puras (totales, fechas, DNI/RUC, letras, huellas)
 │   └── widgets/     piezas visuales sin dependencias de negocio
 ├── domain/          el negocio, sin saber de Flutter ni de SQLite
 │   ├── entities/    Trabajo, Repuesto, Recordatorio, Negocio, líneas
 │   ├── repositories/ contratos (interfaces abstractas)
 │   └── services/    CalculadoraTotales — las reglas de plata
 ├── data/            implementación
-│   ├── local/       esquema e índices de SQLite
+│   ├── local/       esquema, índices y migraciones de SQLite
 │   ├── repositories/ un repo por tabla
+│   ├── cuenta/      la cuenta de correo (Firebase), detrás de un contrato
 │   ├── documentos/  generación de los PDF
 │   └── fotos/       cámara, galería y compresión
 ├── presentation/
@@ -48,7 +50,8 @@ lib/
 ```
 
 `app/providers.dart` es el **único** archivo que conoce las dos capas a la vez:
-ahí se decide qué implementación concreta cumple cada contrato.
+ahí se decide qué implementación concreta cumple cada contrato. Y
+`data/cuenta/cuenta_firebase.dart` es el único que importa Firebase.
 
 ## Las reglas que no se negocian
 
@@ -68,6 +71,21 @@ ahí se decide qué implementación concreta cumple cada contrato.
   día deja de valer, así que se pide la contraseña una vez por jornada. Se
   revisa al volver del segundo plano y no con un cronómetro: un cronómetro te
   echa a media tarde, con el equipo abierto y las manos sucias.
+- **La contraseña se guarda como huella, nunca tal cual** (PBKDF2-SHA256, con
+  sal). La de fábrica es la única sin huella: está escrita más abajo, no es un
+  secreto, y "sin huella" es justamente como se sabe que nadie la cambió.
+- **El correo recupera la contraseña; no decide quién entra.** Sin señal lo
+  único que hay para comparar es la huella del teléfono, así que la cuenta de
+  correo no puede dejar afuera a quien tiene la última contraseña con la que
+  entró: no ganaría seguridad —en modo avión esa contraseña entraría igual— y
+  sí podría encerrar al dueño fuera de sus propios datos. La consecuencia que
+  conviene saber: **cambiar la contraseña con el enlace del correo no la
+  cambia en un teléfono que sigue sin señal**, hasta que se entra con señal.
+  Para cambiarla en el teléfono mismo: Negocio › Cambiar contraseña.
+- **Las migraciones de la base miran antes de tocar.** Hasta la versión 4 del
+  esquema, el teléfono abría la base sin migrar, así que hay bases que dicen
+  "versión 1" y ya traen casi todo adentro. Cada paso se fija si la columna o
+  la tabla ya existe, y hay tests que abren copias fieles de esas bases.
 - **Las fotos viven en su propia tabla, con los bytes crudos.** Antes iban
   dentro del registro convertidas a texto (base64), un formato que infla
   cualquier archivo un 33%. Además el historial ya no las carga: pide solo una
@@ -91,7 +109,7 @@ sigue como estaba.
 Adentro del ZIP van `datos.json` con las filas de cada tabla y `fotos/<id>.jpg`
 con las imágenes en crudo. Es ZIP y no una copia de la base porque se puede
 abrir y mirar: si algo sale mal, los datos se rescatan con el explorador de
-archivos y sin esta app.
+archivos y sin esta app. **La contraseña no viaja en el respaldo.**
 
 **Restaurar reemplaza, no mezcla.** Fusionar dos historiales con correlativos
 propios dejaría códigos repetidos en los documentos.
@@ -151,10 +169,47 @@ flutter run
 ```
 
 Primer ingreso: usuario `Samuel`, contraseña `Admin123`. Se cambia desde
-Negocio › Cambiar contraseña, no editando el código.
+Negocio › Cambiar contraseña (mínimo 6 caracteres), no editando el código.
 
 En Windows, `flutter pub get` pide **Modo de desarrollador** activado para
 poder crear los symlinks de los plugins (`start ms-settings:developers`).
+
+El **escritorio de Windows no es destino**: con Firebase en el proyecto,
+compilar para Windows descarga el SDK de C++ de Firebase. Se usa el celular, o
+Chrome para mirar.
+
+### El APK
+
+```bash
+flutter build apk --release
+```
+
+Queda en `build/app/outputs/flutter-apk/app-release.apk`. En Windows,
+`android/gradle.properties` apaga la compilación incremental de Kotlin: con ella
+el build se cae con *Could not close incremental caches*.
+
+### Recuperación de contraseña por correo
+
+Usa **Firebase Authentication en el plan gratuito** (Spark), sin tarjeta. Solo
+eso: ni Firestore ni Storage.
+
+Para activarla:
+
+1. En la consola de Firebase: Authentication › Método de acceso › activar
+   **Correo electrónico/contraseña**.
+2. Registrar la app Android con el id `com.example.taller_repuestos` y dejar el
+   `google-services.json` en `android/app/`.
+
+Ese archivo **no se versiona**: el repo es público. Sin él la app compila y
+funciona igual, solo que sin recuperación por correo — es lo que permite
+compilar a cualquiera que clone el proyecto. En la vista web tampoco está.
+
+Si algún día cambia el `applicationId` (Play Store no acepta `com.example`),
+hay que registrar la app de nuevo en Firebase y bajar otro json: con el viejo,
+el build falla.
+
+Dentro de la app: Negocio › Recuperación por correo. Con la contraseña de
+fábrica no deja vincular: una cuenta con esa contraseña sería de cualquiera.
 
 ### En el navegador, para mirar rápido
 
@@ -182,10 +237,12 @@ rechaza y SQLite nunca arranca.
 ## Pendiente, fuera de alcance por ahora
 
 - **Respaldo automático en la nube.** Hoy el respaldo es manual, y depende de
-  que alguien se acuerde de hacerlo. Firebase Authentication entra en el plan
-  gratis, pero **Cloud Storage ya exige plan Blaze** (con tarjeta), así que la
-  subida automática de las fotos quedó pendiente de esa decisión.
-- **El APK de Android nunca se llegó a compilar hasta el final**: el build se
-  cortó a los 40 minutos. La app corre en el navegador y las pantallas están
-  verificadas con los retratos, pero el paquete de Android está sin probar.
+  que alguien se acuerde de hacerlo. La cuenta de correo ya existe, pero
+  **Cloud Storage exige plan Blaze** (con tarjeta), así que la subida
+  automática de las fotos quedó pendiente de esa decisión.
+- **Confirmar el correo desde la app.** Al vincularlo se manda un correo de
+  confirmación; si no llega, es la señal de que la dirección quedó mal escrita.
+  La app todavía no muestra si ya se confirmó.
+- **La clave de firma del APK.** Hoy va firmado con la de depuración: sirve
+  para instalarlo, no para Play Store.
 - Notificaciones push reales — hoy el aviso de vencidos sale al abrir la app.

@@ -5,16 +5,21 @@ import '../../../app/providers.dart';
 import '../../../core/theme/movimiento.dart';
 import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/texto.dart';
 import '../../../core/utils/validacion.dart';
+import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/campo.dart';
 import '../../../core/widgets/contenido.dart';
 import '../../../core/widgets/textura.dart';
 import '../../../data/local/app_database.dart';
+import '../../../domain/repositories/auth_repository.dart';
 
 /// Entrada a la app.
 ///
-/// Es una traba de uso, no seguridad real: la app corre entera en el
-/// dispositivo, no hay nada del otro lado que proteger.
+/// Dos caras. Sin correo vinculado, usuario y contraseña como siempre. Con
+/// correo, solo la contraseña: la cuenta se muestra a medio tapar, porque esta
+/// pantalla la ve cualquiera que levante el teléfono y el correo completo es
+/// justo lo que alguien necesitaría para molestar la cuenta desde afuera.
 ///
 /// La cabecera repite el vino y la regla dorada de la bienvenida: la pantalla
 /// anterior se levantó y dejó esto debajo, así que tiene que sentirse el mismo
@@ -33,9 +38,15 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
   final _usuario = TextEditingController();
   final _clave = TextEditingController();
 
-  bool _verClave = false;
-  bool _entrando = false;
-  String? _errorAcceso;
+  EstadoCuenta? _estado;
+  bool _ocupado = false;
+  ResultadoAuth? _fallo;
+
+  @override
+  void initState() {
+    super.initState();
+    _leerEstado();
+  }
 
   @override
   void dispose() {
@@ -44,35 +55,167 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
     super.dispose();
   }
 
+  Future<void> _leerEstado() async {
+    EstadoCuenta estado;
+    ResultadoAuth? fallo;
+
+    try {
+      estado = await ref.read(authRepoProvider).estado();
+    } catch (_) {
+      // Sin poder leer la cuenta se muestra el formulario de siempre y se dice
+      // qué pasó: una pantalla vacía no deja ni intentar.
+      estado = const EstadoCuenta(usuario: usuarioInicial);
+      fallo = const ResultadoAuth.error(
+        'No se pudo leer el acceso de este teléfono. Cierra la app y vuelve a '
+        'abrirla.',
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _estado = estado;
+      _fallo = fallo;
+    });
+  }
+
+  /// Algo reventó por debajo. El botón no puede quedar girando para siempre.
+  void _falloInesperado() {
+    if (!mounted) return;
+    setState(() {
+      _ocupado = false;
+      _fallo = const ResultadoAuth.error(
+        'Algo falló al entrar. Vuelve a probar.',
+      );
+    });
+  }
+
   Future<void> _entrar() async {
-    if (_entrando) return;
+    if (_ocupado) return;
     if (!_form.currentState!.validate()) return;
 
     setState(() {
-      _entrando = true;
-      _errorAcceso = null;
+      _ocupado = true;
+      _fallo = null;
     });
 
     final auth = ref.read(authRepoProvider);
-    final ok = await auth.validarLogin(_usuario.text, _clave.text);
+    final ResultadoAuth resultado;
+    try {
+      resultado = await auth.entrar(
+        usuario: _usuario.text,
+        clave: _clave.text,
+      );
+    } catch (_) {
+      _falloInesperado();
+      return;
+    }
 
     if (!mounted) return;
 
-    if (!ok) {
+    if (!resultado.correcto) {
       setState(() {
-        _entrando = false;
-        _errorAcceso = 'Usuario o contraseña incorrectos.';
+        _ocupado = false;
+        _fallo = resultado;
       });
       return;
     }
 
-    await auth.abrirSesion();
-    if (mounted) widget.alEntrar();
+    await _pasar(auth);
+  }
+
+  Future<void> _pasar(AuthRepository auth) async {
+    try {
+      await auth.abrirSesion();
+    } catch (_) {
+      _falloInesperado();
+      return;
+    }
+    if (!mounted) return;
+    ref.invalidate(estadoCuentaProvider);
+    widget.alEntrar();
+  }
+
+  /// La cuenta de correo ya no acepta la última contraseña de este teléfono.
+  ///
+  /// No se deja a nadie afuera por eso: sin señal esa contraseña entraría
+  /// igual. Se le dice qué pasa y se le ofrece seguir sin el correo.
+  Future<void> _seguirSinCorreo() async {
+    final seguro = await confirmar(
+      context,
+      titulo: '¿Seguir sin el correo?',
+      mensaje: 'Entras con la contraseña de siempre y este teléfono deja de '
+          'usar el correo para recuperarla. Puedes volver a vincularlo desde '
+          'el menú del negocio.',
+      aceptar: 'Seguir sin el correo',
+    );
+    if (!seguro || !mounted) return;
+
+    setState(() => _ocupado = true);
+
+    final auth = ref.read(authRepoProvider);
+    final ResultadoAuth resultado;
+    try {
+      resultado = await auth.desvincularCorreo(_clave.text);
+    } catch (_) {
+      _falloInesperado();
+      return;
+    }
+    if (!mounted) return;
+
+    if (!resultado.correcto) {
+      setState(() {
+        _ocupado = false;
+        _fallo = resultado;
+      });
+      return;
+    }
+
+    await _pasar(auth);
+  }
+
+  Future<void> _olvide() async {
+    final correo = _estado?.correo;
+    if (_ocupado || correo == null) return;
+
+    final seguro = await confirmar(
+      context,
+      titulo: '¿Te mandamos un enlace?',
+      mensaje: 'Va a ${ocultarCorreo(correo)}. Ábrelo, pon una contraseña '
+          'nueva y entra con ella aquí.',
+      aceptar: 'Enviar enlace',
+    );
+    if (!seguro || !mounted) return;
+
+    setState(() => _ocupado = true);
+
+    ResultadoAuth resultado;
+    try {
+      resultado = await ref.read(authRepoProvider).enviarRecuperacion();
+    } catch (_) {
+      resultado = const ResultadoAuth.error(
+        'Algo falló al enviar el enlace. Vuelve a probar.',
+      );
+    }
+
+    if (!mounted) return;
+    setState(() => _ocupado = false);
+
+    if (!resultado.correcto) {
+      mostrarAviso(context, resultado.error ?? '', problema: true);
+      return;
+    }
+
+    await informar(
+      context,
+      titulo: 'Revisa tu correo',
+      mensaje: resultado.aviso ?? '',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final nombre = ref.watch(negocioProvider).nombre.trim();
+    final estado = _estado;
 
     return Scaffold(
       backgroundColor: Tono.vinoHondo,
@@ -98,69 +241,12 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                     Espacio.xl,
                     Espacio.xl,
                   ),
-                  child: EntradaSuave(
-                    child: Form(
-                      key: _form,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text('Ingresa para continuar', style: Tipo.titulo2),
-                          const SizedBox(height: Espacio.xl),
-                          Campo(
-                            etiqueta: 'Usuario',
-                            controlador: _usuario,
-                            ejemplo: usuarioInicial,
-                            textoAccion: TextInputAction.next,
-                            validador: Valida.obligatorio('el usuario'),
-                            onCambio: (_) =>
-                                setState(() => _errorAcceso = null),
-                          ),
-                          const SizedBox(height: Espacio.lg),
-                          Campo(
-                            etiqueta: 'Contraseña',
-                            controlador: _clave,
-                            oculto: !_verClave,
-                            ejemplo: '••••••••',
-                            textoAccion: TextInputAction.done,
-                            validador: Valida.obligatorio('la contraseña'),
-                            onCambio: (_) =>
-                                setState(() => _errorAcceso = null),
-                            onEnviar: (_) => _entrar(),
-                            sufijo: IconButton(
-                              onPressed: () =>
-                                  setState(() => _verClave = !_verClave),
-                              icon: Icon(
-                                _verClave
-                                    ? Icons.visibility_off_rounded
-                                    : Icons.visibility_rounded,
-                                size: 21,
-                                color: Tono.texto3,
-                              ),
-                              tooltip: _verClave ? 'Ocultar' : 'Mostrar',
-                            ),
-                          ),
-                          if (_errorAcceso != null) ...[
-                            const SizedBox(height: Espacio.lg),
-                            _Error(mensaje: _errorAcceso!),
-                          ],
-                          const SizedBox(height: Espacio.xl),
-                          FilledButton(
-                            onPressed: _entrando ? null : _entrar,
-                            child: _entrando
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Entrar'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  // Lo que tarda en leerse la cuenta son milisegundos. El
+                  // formulario entra recién ahí, para no dibujar "Usuario" y
+                  // cambiarlo de golpe cuando resulta que hay correo.
+                  child: estado == null
+                      ? const SizedBox(height: 280)
+                      : EntradaSuave(child: _formulario(estado)),
                 ),
               ),
             ),
@@ -169,6 +255,124 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
       ),
     );
   }
+
+  Widget _formulario(EstadoCuenta estado) {
+    final fallo = _fallo;
+
+    return Form(
+      key: _form,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            estado.conCorreo
+                ? 'Ingresa tu contraseña'
+                : 'Ingresa para continuar',
+            style: Tipo.titulo2,
+          ),
+          const SizedBox(height: Espacio.xl),
+          if (estado.conCorreo)
+            _Cuenta(correo: estado.correo!)
+          else
+            Campo(
+              etiqueta: 'Usuario',
+              controlador: _usuario,
+              ejemplo: usuarioInicial,
+              textoAccion: TextInputAction.next,
+              validador: Valida.obligatorio('el usuario'),
+              onCambio: (_) => setState(() => _fallo = null),
+            ),
+          const SizedBox(height: Espacio.lg),
+          Campo(
+            etiqueta: 'Contraseña',
+            controlador: _clave,
+            oculto: true,
+            ejemplo: '••••••••',
+            textoAccion: TextInputAction.done,
+            validador: Valida.obligatorio('la contraseña'),
+            onCambio: (_) => setState(() => _fallo = null),
+            onEnviar: (_) => _entrar(),
+          ),
+          if (fallo != null) ...[
+            const SizedBox(height: Espacio.lg),
+            _Error(mensaje: fallo.error ?? ''),
+            if (fallo.motivo == MotivoAuth.cuentaRechazaClave) ...[
+              const SizedBox(height: Espacio.md),
+              OutlinedButton(
+                onPressed: _ocupado ? null : _seguirSinCorreo,
+                child: const Text('Seguir sin el correo'),
+              ),
+            ],
+          ],
+          const SizedBox(height: Espacio.xl),
+          FilledButton(
+            onPressed: _ocupado ? null : _entrar,
+            child: _ocupado
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text('Entrar'),
+          ),
+          if (estado.conCorreo && estado.nubeDisponible) ...[
+            const SizedBox(height: Espacio.md),
+            TextButton(
+              onPressed: _ocupado ? null : _olvide,
+              child: const Text('¿Olvidaste tu contraseña?'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// La cuenta con la que se entra, a medio tapar y sin poder editarla.
+class _Cuenta extends StatelessWidget {
+  const _Cuenta({required this.correo});
+
+  final String correo;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Espacio.lg,
+          vertical: Espacio.md,
+        ),
+        decoration: BoxDecoration(
+          color: Tono.fondo2,
+          borderRadius: Redondeo.brChico,
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.mail_outline_rounded,
+              size: 20,
+              color: Tono.texto3,
+            ),
+            const SizedBox(width: Espacio.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('CUENTA', style: Tipo.etiqueta),
+                  const SizedBox(height: 2),
+                  Text(
+                    ocultarCorreo(correo),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Tipo.cuerpo,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 /// La cabecera del login: el emblema centrado sobre la banda de marca.

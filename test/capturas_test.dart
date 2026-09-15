@@ -9,8 +9,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taller_repuestos/app/providers.dart';
+import 'package:taller_repuestos/core/utils/clave_segura.dart';
 import 'package:taller_repuestos/core/theme/app_theme.dart';
+import 'package:taller_repuestos/core/theme/tokens.dart';
 import 'package:taller_repuestos/data/local/app_database.dart';
 import 'package:taller_repuestos/data/repositories/inventario_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/negocio_repository_sqlite.dart';
@@ -28,6 +31,8 @@ import 'package:taller_repuestos/presentation/features/negocio/pantalla_negocio.
 import 'package:taller_repuestos/presentation/features/negocio/pantalla_respaldo.dart';
 import 'package:taller_repuestos/presentation/features/shell/shell_principal.dart';
 import 'package:taller_repuestos/presentation/features/trabajo/wizard_trabajo.dart';
+
+import 'falsos/cuenta_falsa.dart';
 
 /// Retratos de las pantallas, para mirarlas.
 ///
@@ -48,6 +53,9 @@ void main() {
   setUpAll(_cargarFuentes);
 
   setUp(() async {
+    // El acceso lee preferencias (la sesión, el freno de intentos) y en las
+    // pruebas no hay plugin del otro lado.
+    SharedPreferences.setMockInitialValues({});
     base = await AppDatabase.enMemoria();
     await _sembrar(base);
   });
@@ -83,6 +91,63 @@ void main() {
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('capturas/7-login.png'),
+    );
+  });
+
+  testWidgets('login con correo vinculado', (tester) async {
+    await tester.runAsync(
+      () => _ponerClave('Taller2026', correo: 'wilmer.taller@gmail.com'),
+    );
+    await _mostrar(tester, PantallaLogin(alEntrar: () {}));
+    expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/14-login-correo.png'),
+    );
+  });
+
+  testWidgets('login: la cuenta ya no acepta la contraseña', (tester) async {
+    await tester.runAsync(
+      () => _ponerClave('Taller2026', correo: 'wilmer.taller@gmail.com'),
+    );
+    // Se cambió con el enlace del correo en otra parte: la cuenta tiene otra.
+    nube_.cuentas['wilmer.taller@gmail.com'] = 'LaCambioOtro';
+
+    await _mostrar(tester, PantallaLogin(alEntrar: () {}));
+    await tester.enterText(find.byType(TextFormField).last, 'Taller2026');
+    await tester.tap(find.text('Entrar'));
+    await _esperarA(tester, find.text('Seguir sin el correo'));
+    await tester.pump(const Duration(milliseconds: 700));
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/15-login-rechazo.png'),
+    );
+  });
+
+  testWidgets('ventana de recuperación por correo', (tester) async {
+    await tester.runAsync(() => _ponerClave('Taller2026'));
+    await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
+    await tester.tap(find.byIcon(Icons.storefront_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Recuperación por correo'));
+    await _asentar(tester);
+    expect(find.text('Vincular correo'), findsOneWidget);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/16-ventana-correo.png'),
+    );
+  });
+
+  testWidgets('ventana de correo con la contraseña de fábrica', (tester) async {
+    await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
+    await tester.tap(find.byIcon(Icons.storefront_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Recuperación por correo'));
+    await _asentar(tester);
+    expect(find.textContaining('contraseña de fábrica'), findsOneWidget);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/17-ventana-correo-fabrica.png'),
     );
   });
 
@@ -122,6 +187,8 @@ void main() {
     await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
     await tester.tap(find.byIcon(Icons.more_horiz_rounded).first);
     await _asentar(tester);
+    expect(find.text('Descargar PDF'), findsOneWidget);
+    expect(find.byTooltip('Compartir'), findsOneWidget);
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('capturas/10-ventana-acciones.png'),
@@ -134,6 +201,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cambiar contraseña').last);
     await _asentar(tester);
+    // Un ojo por cada campo de contraseña.
+    expect(find.byTooltip('Mostrar contraseña'), findsNWidgets(3));
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('capturas/9-ventana-clave.png'),
@@ -204,10 +273,49 @@ void main() {
     await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
     await tester.tap(find.byIcon(Icons.inventory_2_rounded).first);
     await _asentar(tester);
+    expect(find.byTooltip('Nuevo repuesto'), findsOneWidget);
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('capturas/5-inventario.png'),
     );
+  });
+
+  // Sin captura: solo mide. Un teléfono de 360 puntos con contadores de dos
+  // cifras es el caso justo, y ahí el "+" no puede tapar "Agotados".
+  testWidgets('inventario en 360 puntos: los chips entran junto al +',
+      (tester) async {
+    final inventario = InventarioRepositorySqlite(base_);
+    await tester.runAsync(() async {
+      for (var i = 0; i < 10; i++) {
+        await inventario.crear(
+          Repuesto(nombre: 'Con stock $i', stock: 5, precio: 10),
+        );
+        await inventario.crear(Repuesto(nombre: 'Agotado $i', precio: 10));
+      }
+    });
+
+    await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
+    tester.view.physicalSize = const Size(1080, 2400);
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.inventory_2_rounded).first);
+    await _asentar(tester);
+
+    // Todos 23 · Con stock 12 · Agotados 11.
+    expect(find.text('23'), findsOneWidget);
+    final chip = find.ancestor(
+      of: find.text('Agotados'),
+      matching: find.byType(AnimatedContainer),
+    );
+    final rect = tester.getRect(chip.first);
+    expect(
+      rect.right,
+      lessThanOrEqualTo(
+        tester.getRect(find.byTooltip('Nuevo repuesto')).left - Espacio.sm,
+      ),
+    );
+    // Entra achicándose lo justo, no a costa de volverse ilegible: el chip
+    // mide 38 de alto sin achicar.
+    expect(rect.height, greaterThanOrEqualTo(34));
   });
 }
 
@@ -246,7 +354,10 @@ Future<void> _montar(WidgetTester tester, Widget pantalla) async {
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [baseDatosProvider.overrideWithValue(base_)],
+      overrides: [
+        baseDatosProvider.overrideWithValue(base_),
+        cuentaRemotaProvider.overrideWithValue(nube_),
+      ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.claro(),
@@ -282,11 +393,15 @@ Future<void> _asentar(WidgetTester tester) async {
 /// función suelta y necesita alcanzarla.
 late AppDatabase base_;
 
+/// La cuenta de correo de mentira que ven las capturas.
+late CuentaFalsa nube_;
+
 /// El registro a medias, para retratar el wizard en un paso del medio.
 late int pendienteId;
 
 Future<void> _sembrar(AppDatabase db) async {
   base_ = db;
+  nube_ = CuentaFalsa();
 
   final inventario = InventarioRepositorySqlite(db);
   final trabajos = TrabajosRepositorySqlite(db, inventario);
@@ -398,4 +513,37 @@ Future<void> _sembrar(AppDatabase db) async {
     cliente: 'Luis Paredes',
   ));
   await recordatorios.refrescarVencidos();
+}
+
+/// Deja el acceso como si ya se hubiera cambiado la contraseña y, si se pasa,
+/// vinculado un correo. Pocas vueltas: acá se retrata, no se protege.
+Future<void> _ponerClave(String clave, {String? correo}) async {
+  final huella = HuellaClave.de(clave, vueltas: 500);
+  await base_.db.update(
+    'auth',
+    {
+      'claveHuella': huella.huella,
+      'claveSal': huella.sal,
+      'claveVueltas': huella.vueltas,
+      'correo': correo,
+    },
+    where: 'id = 1',
+  );
+}
+
+/// Deja avanzar lo que tarda de verdad —la base, el isolate de la huella—
+/// hasta que aparece [objetivo].
+///
+/// Hace falta cuando una acción encadena varios pasos asíncronos reales:
+/// [_asentar] deja correr uno solo, y la captura salía con el spinner. Si el
+/// objetivo nunca aparece, falla en voz alta: con `--update-goldens` una
+/// captura siempre "pasa", así que sin esto retrataría un estado a medias.
+Future<void> _esperarA(WidgetTester tester, Finder objetivo) async {
+  for (var i = 0; i < 50 && objetivo.evaluate().isEmpty; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pump();
+  }
+  expect(objetivo, findsWidgets);
 }

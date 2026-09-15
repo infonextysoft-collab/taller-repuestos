@@ -111,8 +111,8 @@ class RespaldoZip implements RespaldoRepository {
     final formato = (datos['formato'] as num?)?.toInt() ?? 0;
     if (formato > _formato) {
       throw const RespaldoInvalido(
-        'Ese respaldo lo hizo una versión más nueva de la app. Actualizá la app '
-        'y volvé a intentar.',
+        'Ese respaldo lo hizo una versión más nueva de la app. Actualiza la app '
+        'y vuelve a intentar.',
       );
     }
 

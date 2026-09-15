@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taller_repuestos/core/utils/fechas.dart';
+import 'package:taller_repuestos/data/cuenta/cuenta_remota.dart';
 import 'package:taller_repuestos/data/local/app_database.dart';
 import 'package:taller_repuestos/data/repositories/auth_repository_sqlite.dart';
 
@@ -12,7 +13,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     base = await AppDatabase.enMemoria();
-    auth = AuthRepositorySqlite(base);
+    auth = AuthRepositorySqlite(base, const CuentaNoDisponible());
   });
 
   tearDown(() => base.cerrar());

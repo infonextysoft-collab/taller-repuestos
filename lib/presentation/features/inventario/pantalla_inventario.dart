@@ -169,16 +169,47 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
                   ),
                   if (_items.isNotEmpty) ...[
                     const SizedBox(height: Espacio.md),
-                    FiltroChips<_FiltroStock>(
-                      valor: _filtro,
-                      opciones: [
-                        OpcionChip(_FiltroStock.todos, 'Todos', _items.length),
-                        OpcionChip(_FiltroStock.conStock, 'Con stock',
-                            _items.length - _agotados),
-                        OpcionChip(
-                            _FiltroStock.agotados, 'Agotados', _agotados),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FiltroChips<_FiltroStock>(
+                            compactos: true,
+                            valor: _filtro,
+                            opciones: [
+                              OpcionChip(
+                                  _FiltroStock.todos, 'Todos', _items.length),
+                              OpcionChip(_FiltroStock.conStock, 'Con stock',
+                                  _items.length - _agotados),
+                              OpcionChip(_FiltroStock.agotados, 'Agotados',
+                                  _agotados),
+                            ],
+                            onCambio: (f) => setState(() => _filtro = f),
+                          ),
+                        ),
+                        const SizedBox(width: Espacio.sm),
+                        // Arriba y siempre a mano: con cien repuestos, el
+                        // botón del final de la lista queda a cien filas.
+                        // Va en blanco con el ícono en vino, igual que el
+                        // escáner de arriba, para no confundirse con el "+"
+                        // grande de la barra, que carga un trabajo.
+                        SizedBox(
+                          width: kAreaTactil,
+                          height: kAreaTactil,
+                          child: Tooltip(
+                            message: 'Nuevo repuesto',
+                            child: OutlinedButton(
+                              onPressed: _abrirFormulario,
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size.square(kAreaTactil),
+                                foregroundColor: Tono.vino,
+                                shape: const CircleBorder(),
+                              ),
+                              child: const Icon(Icons.add_rounded, size: 24),
+                            ),
+                          ),
+                        ),
                       ],
-                      onCambio: (f) => setState(() => _filtro = f),
                     ),
                   ],
                 ],

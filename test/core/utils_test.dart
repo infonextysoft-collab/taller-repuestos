@@ -139,6 +139,27 @@ void main() {
     });
   });
 
+  group('correo a medio tapar', () {
+    test('deja ver el comienzo y el dominio', () {
+      expect(ocultarCorreo('wilmerbaltazar73@gmail.com'), 'wi•••••@gmail.com');
+    });
+
+    test('un usuario corto no se muestra entero', () {
+      expect(ocultarCorreo('ab@taller.pe'), 'a•••••@taller.pe');
+      expect(ocultarCorreo('a@taller.pe'), 'a•••••@taller.pe');
+    });
+
+    test('los puntos no delatan el largo', () {
+      expect(ocultarCorreo('abc@x.pe'), ocultarCorreo('abcdefghij@x.pe'));
+    });
+
+    test('lo que no es correo no se muestra', () {
+      expect(ocultarCorreo('sin-arroba'), '•••••');
+      expect(ocultarCorreo('@solo-dominio.pe'), '•••••');
+      expect(ocultarCorreo('   '), '');
+    });
+  });
+
   group('código de barras', () {
     test('un EAN-13 con su verificador cierra', () {
       expect(codigoBarrasValido('7501234567893'), isTrue);

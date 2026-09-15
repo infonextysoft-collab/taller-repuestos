@@ -4,6 +4,19 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// La configuración de Firebase no se versiona: el repo es público. Sin el
+// archivo la app compila igual y funciona sin recuperación por correo, que es
+// lo que permite compilar a cualquiera que clone el proyecto. Con el archivo se
+// aplica el plugin que lo convierte en los recursos que Firebase lee al
+// arrancar.
+//
+// Ojo: el archivo está registrado para el applicationId de abajo. Si ese id
+// cambia, hay que registrar la app de nuevo en la consola de Firebase y bajar
+// otro google-services.json, o este build falla.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.taller_repuestos"
     compileSdk = flutter.compileSdkVersion

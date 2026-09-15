@@ -1,7 +1,8 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show compute, kIsWeb, visibleForTesting;
 
+import '../../core/utils/clave_segura.dart';
 import '../../core/utils/imagenes.dart';
 import '../../domain/entities/foto.dart';
 import 'fabrica_db.dart';
@@ -10,6 +11,11 @@ import 'fabrica_db.dart';
 /// editando este archivo.
 const String usuarioInicial = 'Samuel';
 const String claveInicial = 'Admin123';
+
+/// Cuántas vueltas lleva una huella nueva en esta plataforma. Una sola fuente
+/// para la migración y para el acceso: si se separan, la web termina trabando
+/// la pestaña con el costo pensado para el celular.
+int get vueltasClave => kIsWeb ? kVueltasClaveWeb : kVueltasClave;
 
 /// Nombre interno del archivo. **No sigue al nombre del negocio**: renombrarlo
 /// dejaría huérfanos los datos ya guardados en los celulares donde la app se
@@ -32,64 +38,135 @@ class AppDatabase {
     if (_instancia != null) return _instancia!;
 
     // Qué motor usar lo decide `fabrica_db.dart` según la plataforma.
-    final base = await fabricaDb().openDatabase(
-      await rutaDb(_archivoDb),
-      options: OpenDatabaseOptions(version: 1, onCreate: _crear),
-    );
-
-    _instancia = AppDatabase._(base);
-    await _instancia!._sembrarAuth();
+    _instancia = await abrirEn(fabricaDb(), await rutaDb(_archivoDb));
     return _instancia!;
   }
 
   /// Solo para los tests: base en memoria, sin tocar el disco.
-  static Future<AppDatabase> enMemoria() async {
-    final base = await fabricaDbMemoria().openDatabase(
-      rutaEnMemoria,
-      options: OpenDatabaseOptions(
-        version: _version,
-        onCreate: _crear,
-        onUpgrade: _actualizar,
-      ),
-    );
+  static Future<AppDatabase> enMemoria() =>
+      abrirEn(fabricaDbMemoria(), rutaEnMemoria);
+
+  /// Abre la base de un archivo concreto.
+  ///
+  /// Es el único camino, tanto para el teléfono como para los tests: queda
+  /// aparte de [abrir] para poder probar la apertura sobre copias de bases
+  /// viejas de verdad.
+  @visibleForTesting
+  static Future<AppDatabase> abrirEn(DatabaseFactory fabrica, String ruta) async {
+    final base = await fabrica.openDatabase(ruta, options: _opciones);
     final instancia = AppDatabase._(base);
     await instancia._sembrarAuth();
     return instancia;
   }
+
+  /// Las mismas opciones en el teléfono y en los tests.
+  ///
+  /// Hasta la versión 4 no lo eran: el teléfono abría la base como "versión 1"
+  /// y sin migraciones, así que las migraciones solo corrían en los tests. Una
+  /// instalación nueva salía bien —la base se crea con el esquema completo—,
+  /// pero una base ya existente nunca recibía las tablas nuevas.
+  static OpenDatabaseOptions get _opciones => OpenDatabaseOptions(
+        version: _version,
+        onCreate: _crear,
+        onUpgrade: _actualizar,
+      );
 
   /// 1 → 2: los recordatorios pasaron de "cada N meses" a un intervalo libre
   /// (N días / semanas / meses / años) y ganaron la marca de importante.
   ///
   /// 2 → 3: las fotos salieron de adentro del registro y pasaron a su propia
   /// tabla, con los bytes crudos en vez de texto base64.
-  static const int _version = 3;
+  ///
+  /// 3 → 4: la contraseña deja de guardarse tal cual —queda su huella— y la
+  /// tabla gana el correo con el que se recupera.
+  static const int _version = 4;
 
+  @visibleForTesting
+  static int get version => _version;
+
+  /// Cada paso **mira antes de tocar**.
+  ///
+  /// Como el teléfono abría todo como "versión 1" (ver [_opciones]), hay bases
+  /// que dicen 1 y ya traen casi todo adentro: la de la vista web tiene las
+  /// columnas de la v2 pero no la tabla de fotos, y la del primer APK tiene
+  /// todo hasta la v3. Agregar una columna que ya existe revienta la apertura,
+  /// y con ella la app entera, así que nada se agrega sin fijarse primero.
+  ///
+  /// sqflite corre esto dentro de una transacción: si algo falla a la mitad,
+  /// la base queda como estaba y no a medio migrar.
+  ///
   /// Las columnas viejas `recordatorioMeses` y `repetirMeses` **quedan**: son
   /// de dónde lee el intervalo cualquier registro guardado antes de esto, y
   /// borrarlas obligaría a reescribir toda la tabla para no ganar nada.
   static Future<void> _actualizar(Database d, int desde, int hasta) async {
     if (desde < 2) {
-      for (final sentencia in const [
-        'ALTER TABLE trabajos ADD COLUMN recordatorioCada INTEGER',
-        'ALTER TABLE trabajos ADD COLUMN recordatorioUnidad TEXT',
-        'ALTER TABLE recordatorios ADD COLUMN repetirCada INTEGER',
-        'ALTER TABLE recordatorios ADD COLUMN repetirUnidad TEXT',
-        'ALTER TABLE recordatorios ADD COLUMN importante INTEGER NOT NULL '
-            'DEFAULT 0',
-        "UPDATE trabajos SET recordatorioCada = recordatorioMeses, "
-            "recordatorioUnidad = 'meses' WHERE recordatorioMeses IS NOT NULL",
-        "UPDATE recordatorios SET repetirCada = repetirMeses, "
-            "repetirUnidad = 'meses' WHERE repetirMeses IS NOT NULL",
-      ]) {
-        await d.execute(sentencia);
+      final nuevoEnTrabajos =
+          await _agregarColumna(d, 'trabajos', 'recordatorioCada', 'INTEGER');
+      await _agregarColumna(d, 'trabajos', 'recordatorioUnidad', 'TEXT');
+
+      final nuevoEnRecordatorios =
+          await _agregarColumna(d, 'recordatorios', 'repetirCada', 'INTEGER');
+      await _agregarColumna(d, 'recordatorios', 'repetirUnidad', 'TEXT');
+      await _agregarColumna(
+          d, 'recordatorios', 'importante', 'INTEGER NOT NULL DEFAULT 0');
+
+      // El intervalo viejo se copia solo donde la columna recién nace. En una
+      // base que ya la tenía, lo que hay adentro es lo bueno: pisarlo
+      // convertiría un "cada 15 días" en meses.
+      if (nuevoEnTrabajos) {
+        await d.execute(
+          "UPDATE trabajos SET recordatorioCada = recordatorioMeses, "
+          "recordatorioUnidad = 'meses' WHERE recordatorioMeses IS NOT NULL",
+        );
+      }
+      if (nuevoEnRecordatorios) {
+        await d.execute(
+          "UPDATE recordatorios SET repetirCada = repetirMeses, "
+          "repetirUnidad = 'meses' WHERE repetirMeses IS NOT NULL",
+        );
       }
     }
 
-    if (desde < 3) {
+    // Si la tabla ya existe, las fotos ya viven ahí: no hay nada que mudar.
+    if (desde < 3 && !await _existeTabla(d, 'fotos')) {
       await d.execute(_tablaFotos);
       await d.execute(_indiceFotos);
       await _mudarFotos(d);
     }
+
+    if (desde < 4) {
+      await _agregarColumna(d, 'auth', 'correo', 'TEXT');
+      await _agregarColumna(d, 'auth', 'claveHuella', 'TEXT');
+      await _agregarColumna(d, 'auth', 'claveSal', 'TEXT');
+      await _agregarColumna(d, 'auth', 'claveVueltas', 'INTEGER');
+      await _protegerClaves(d);
+    }
+  }
+
+  @visibleForTesting
+  static Future<void> actualizar(Database d, int desde, int hasta) =>
+      _actualizar(d, desde, hasta);
+
+  /// Agrega la columna si falta. Devuelve si la tuvo que agregar.
+  static Future<bool> _agregarColumna(
+    Database d,
+    String tabla,
+    String columna,
+    String tipo,
+  ) async {
+    final columnas = await d.rawQuery('PRAGMA table_info($tabla)');
+    if (columnas.any((c) => c['name'] == columna)) return false;
+
+    await d.execute('ALTER TABLE $tabla ADD COLUMN $columna $tipo');
+    return true;
+  }
+
+  static Future<bool> _existeTabla(Database d, String tabla) async {
+    final filas = await d.rawQuery(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [tabla],
+    );
+    return filas.isNotEmpty;
   }
 
   /// Saca las fotos de adentro de `trabajos` y las pasa a su tabla.
@@ -147,11 +224,51 @@ class AppDatabase {
     }
   }
 
+  /// Deja de guardar la contraseña tal cual.
+  ///
+  /// La de fábrica **no** se convierte en huella: está escrita en el README, no
+  /// es un secreto, y "sin huella" es justamente como se reconoce que nadie la
+  /// cambió. Cualquier otra pasa a huella y el texto se borra.
+  @visibleForTesting
+  static Future<void> protegerClaves(Database d) => _protegerClaves(d);
+
+  static Future<void> _protegerClaves(Database d) async {
+    final filas = await d.query(
+      'auth',
+      columns: ['id', 'clave'],
+      where: 'claveHuella IS NULL',
+    );
+
+    for (final fila in filas) {
+      final clave = (fila['clave'] ?? '').toString();
+      final cambios = <String, Object?>{'clave': ''};
+
+      if (clave.isNotEmpty && clave != claveInicial) {
+        // Fuera del hilo principal: esto corre antes del primer cuadro, con
+        // la pantalla de arranque del sistema a la vista.
+        final huella = await compute(_huellaDe, (clave, vueltasClave));
+        cambios
+          ..['claveHuella'] = huella.huella
+          ..['claveSal'] = huella.sal
+          ..['claveVueltas'] = huella.vueltas;
+      }
+
+      await d.update('auth', cambios, where: 'id = ?', whereArgs: [fila['id']]);
+    }
+  }
+
+  static HuellaClave _huellaDe((String, int) datos) =>
+      HuellaClave.de(datos.$1, vueltas: datos.$2);
+
   static Future<void> _crear(Database d, int version) async {
     for (final sentencia in _esquema) {
       await d.execute(sentencia);
     }
   }
+
+  /// El esquema actual completo, como lo recibe una instalación nueva.
+  @visibleForTesting
+  static Future<void> crearEsquema(Database d) => _crear(d, _version);
 
   /// Las fotos, aparte del registro. Ver [Foto] para el porqué.
   ///
@@ -259,25 +376,29 @@ class AppDatabase {
         email     TEXT NOT NULL DEFAULT ''
       )
     ''',
+    // `clave` queda siempre vacía: es la columna donde antes iba la contraseña
+    // tal cual, y SQLite no deja borrar columnas en todas las versiones que
+    // traen los teléfonos. Sin huella significa "la de fábrica".
     '''
       CREATE TABLE auth (
-        id      INTEGER PRIMARY KEY,
-        usuario TEXT NOT NULL,
-        clave   TEXT NOT NULL
+        id           INTEGER PRIMARY KEY,
+        usuario      TEXT    NOT NULL,
+        clave        TEXT    NOT NULL DEFAULT '',
+        correo       TEXT,
+        claveHuella  TEXT,
+        claveSal     TEXT,
+        claveVueltas INTEGER
       )
     ''',
   ];
 
   /// Siembra el usuario por defecto **solo** la primera vez: nunca pisa una
-  /// clave que el usuario ya cambió.
+  /// clave que el usuario ya cambió. Va sin huella, que es como se guarda la
+  /// de fábrica.
   Future<void> _sembrarAuth() async {
     final existente = await db.query('auth', where: 'id = 1', limit: 1);
     if (existente.isEmpty) {
-      await db.insert('auth', {
-        'id': 1,
-        'usuario': usuarioInicial,
-        'clave': claveInicial,
-      });
+      await db.insert('auth', {'id': 1, 'usuario': usuarioInicial, 'clave': ''});
     }
   }
 

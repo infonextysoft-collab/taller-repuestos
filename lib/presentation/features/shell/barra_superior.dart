@@ -4,9 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../domain/repositories/auth_repository.dart';
 
 /// Qué se eligió en el menú del negocio.
-enum AccionNegocio { datos, respaldo, clave, salir }
+enum AccionNegocio { datos, respaldo, correo, clave, salir }
 
 /// La barra de arriba.
 ///
@@ -27,6 +28,7 @@ class BarraSuperior extends ConsumerWidget implements PreferredSizeWidget {
     final negocio = ref.watch(negocioProvider);
     final nombre = negocio.nombre.trim();
     final sinConfigurar = nombre.isEmpty;
+    final cuenta = ref.watch(estadoCuentaProvider).valueOrNull;
 
     return Material(
       color: Tono.fondo,
@@ -40,7 +42,11 @@ class BarraSuperior extends ConsumerWidget implements PreferredSizeWidget {
           ),
           child: Row(
             children: [
-              _MenuNegocio(onAccion: onAccion, avisar: sinConfigurar),
+              _MenuNegocio(
+                onAccion: onAccion,
+                avisar: sinConfigurar,
+                cuenta: cuenta,
+              ),
               const Spacer(),
               Flexible(
                 child: Column(
@@ -94,13 +100,21 @@ class BarraSuperior extends ConsumerWidget implements PreferredSizeWidget {
 /// oscura, igual que la barra de abajo y el marcador: es la misma capa de la
 /// app, así que se ve igual.
 class _MenuNegocio extends StatelessWidget {
-  const _MenuNegocio({required this.onAccion, required this.avisar});
+  const _MenuNegocio({
+    required this.onAccion,
+    required this.avisar,
+    required this.cuenta,
+  });
 
   final ValueChanged<AccionNegocio> onAccion;
 
   /// Un punto sobre el botón mientras falten los datos del emisor: sin ellos
   /// los documentos salen sin cabecera, y eso no se descubre hasta imprimir.
   final bool avisar;
+
+  /// Para la recuperación por correo. Sin cuenta disponible —la vista web, un
+  /// build sin Firebase— la opción no aparece: no habría nada que hacer ahí.
+  final EstadoCuenta? cuenta;
 
   @override
   Widget build(BuildContext context) => PopupMenuButton<AccionNegocio>(
@@ -117,6 +131,19 @@ class _MenuNegocio extends StatelessWidget {
               'Datos del negocio', 'Lo que sale impreso en el documento'),
           _item(AccionNegocio.respaldo, Icons.save_alt_rounded, 'Respaldo',
               'Guardar todo por si pierdes el teléfono'),
+          // Con correo vinculado se muestra aunque no haya Firebase: es el único
+          // lugar desde donde se desvincula, y desvincular no necesita red.
+          if ((cuenta?.nubeDisponible ?? false) || (cuenta?.conCorreo ?? false))
+            _item(
+              AccionNegocio.correo,
+              Icons.mail_outline_rounded,
+              'Recuperación por correo',
+              // Completo, no tapado: acá ya se entró, y un error de tipeo solo
+              // se ve leyéndolo entero.
+              cuenta!.correo == null
+                  ? 'Por si olvidas la contraseña'
+                  : cuenta!.correo!,
+            ),
           _item(AccionNegocio.clave, Icons.lock_outline_rounded,
               'Cambiar contraseña', null),
           const PopupMenuDivider(color: Tono.negroLinea, height: Espacio.md),

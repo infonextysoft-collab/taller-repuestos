@@ -11,15 +11,19 @@ import '../../../core/widgets/avisos.dart';
 import '../../../domain/entities/totales.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../../domain/services/calculadora_totales.dart';
+import '../../comunes/salida_pdf.dart';
+
+enum _Salida { descargar, compartir }
 
 /// El documento en pantalla.
 ///
 /// Se muestra el PDF de verdad, no una imitación en widgets: lo que se ve es
 /// exactamente lo que se va a entregar.
 ///
-/// Una sola acción a la vista: **descargar**. Imprimir y compartir estaban de
-/// más — el papel se manda por WhatsApp desde el archivo ya bajado, y una barra
-/// con tres íconos obliga a elegir antes de hacer lo único que se hace siempre.
+/// Abajo, dos salidas: **descargar**, grande, que deja el PDF en el teléfono,
+/// y **compartir**, al lado y más chico, que lo manda directo por WhatsApp o
+/// correo. Son cosas distintas y cada una hace lo que dice. Imprimir no está:
+/// el papel sale desde el archivo ya bajado.
 ///
 /// Eliminar vive acá arriba, detrás del menú, y ya no en la lista del
 /// historial. Borrar un registro por error es caro —los repuestos vuelven al
@@ -38,7 +42,10 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
   Trabajo? _trabajo;
   List<Boleta> _boletas = const [];
   int _pestana = 0;
-  bool _descargando = false;
+
+  /// La salida que se está armando. Mientras hay una, las dos quedan quietas:
+  /// dos toques seguidos no pueden generar dos PDF.
+  _Salida? _enCurso;
 
   @override
   void initState() {
@@ -101,25 +108,31 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
     Navigator.of(context).pop();
   }
 
-  /// Baja el documento **completo** —reporte y boleta(s)— y no solo la
+  /// Saca el documento **completo** —reporte y boleta(s)— y no solo la
   /// pestaña abierta: es un solo papel para el cliente.
-  Future<void> _descargar() async {
-    if (_descargando) return;
-    setState(() => _descargando = true);
+  Future<void> _sacar(_Salida salida) async {
+    if (_enCurso != null) return;
+    setState(() => _enCurso = salida);
 
     try {
       final t = _trabajo!;
       final bytes = await ref
           .read(generadorPdfProvider)
           .completo(t, ref.read(negocioProvider));
+      final nombre = '${t.codigo}.pdf';
 
-      await Printing.sharePdf(bytes: bytes, filename: '${t.codigo}.pdf');
+      switch (salida) {
+        case _Salida.descargar:
+          if (mounted) await descargarPdf(context, bytes, nombre);
+        case _Salida.compartir:
+          await compartirPdf(bytes, nombre);
+      }
     } catch (e) {
       if (mounted) {
-        mostrarAviso(context, 'No se pudo generar el PDF: $e', problema: true);
+        mostrarAviso(context, 'No se pudo sacar el PDF: $e', problema: true);
       }
     } finally {
-      if (mounted) setState(() => _descargando = false);
+      if (mounted) setState(() => _enCurso = null);
     }
   }
 
@@ -229,27 +242,63 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.all(Espacio.lg),
-            child: FilledButton.icon(
-              onPressed: _descargando ? null : _descargar,
-              icon: _descargando
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _enCurso != null
+                        ? null
+                        : () => _sacar(_Salida.descargar),
+                    icon: _enCurso == _Salida.descargar
+                        ? const _Girando(color: Colors.white)
+                        : const Icon(Icons.download_rounded, size: 20),
+                    label: Text(
+                      _enCurso == _Salida.descargar
+                          ? 'Generando…'
+                          : 'Descargar PDF',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: Espacio.md),
+                SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: Tooltip(
+                    message: 'Compartir',
+                    child: OutlinedButton(
+                      onPressed: _enCurso != null
+                          ? null
+                          : () => _sacar(_Salida.compartir),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        foregroundColor: Tono.vino,
                       ),
-                    )
-                  : const Icon(Icons.picture_as_pdf_rounded, size: 20),
-              label: Text(
-                _descargando ? 'Generando…' : 'Descargar PDF',
-              ),
+                      child: _enCurso == _Salida.compartir
+                          ? const _Girando(color: Tono.vino)
+                          : const Icon(Icons.share_rounded, size: 22),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _Girando extends StatelessWidget {
+  const _Girando({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2, color: color),
+      );
 }
 
 class _Pestana extends StatelessWidget {

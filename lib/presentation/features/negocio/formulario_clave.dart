@@ -6,9 +6,10 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/utils/validacion.dart';
 import '../../../core/widgets/campo.dart';
+import '../../../domain/repositories/auth_repository.dart';
 
 /// Cambio de contraseña. Exige la actual para que nadie la cambie con la
-/// sesión ajena abierta.
+/// sesión ajena abierta. Con correo vinculado, la actual la valida la cuenta.
 class FormularioClave extends ConsumerStatefulWidget {
   const FormularioClave({super.key, required this.onListo});
 
@@ -36,6 +37,7 @@ class _FormularioClaveState extends ConsumerState<FormularioClave> {
   }
 
   Future<void> _guardar() async {
+    if (_guardando) return;
     if (!_form.currentState!.validate()) return;
 
     setState(() {
@@ -43,11 +45,25 @@ class _FormularioClaveState extends ConsumerState<FormularioClave> {
       _error = null;
     });
 
-    final resultado = await ref
-        .read(authRepoProvider)
-        .cambiarClave(_actual.text, _nueva.text);
+    final contenedor = ProviderScope.containerOf(context, listen: false);
+    ResultadoAuth resultado;
+    try {
+      resultado = await contenedor
+          .read(authRepoProvider)
+          .cambiarClave(_actual.text, _nueva.text);
+    } catch (_) {
+      resultado = const ResultadoAuth.error(
+        'Algo falló al cambiar la contraseña. Vuelve a probar.',
+      );
+    }
 
-    if (!mounted) return;
+    // Si la ventana ya no está —la sesión venció mientras se esperaba—, el
+    // cambio igual se avisa: si no, la app seguiría creyendo que está la de
+    // fábrica.
+    if (!mounted) {
+      if (resultado.correcto) contenedor.invalidate(estadoCuentaProvider);
+      return;
+    }
 
     if (!resultado.correcto) {
       setState(() {
@@ -62,66 +78,80 @@ class _FormularioClaveState extends ConsumerState<FormularioClave> {
   }
 
   @override
-  Widget build(BuildContext context) => Form(
-        key: _form,
-        child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          Espacio.xl,
-          0,
-          Espacio.xl,
-          Espacio.xl,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Campo(
-              etiqueta: 'Contraseña actual',
-              controlador: _actual,
-              oculto: true,
-              autofoco: true,
-              textoAccion: TextInputAction.next,
-              validador: Valida.obligatorio('la contraseña actual'),
+  Widget build(BuildContext context) => PopScope(
+        // Mientras guarda no se cierra: el cambio puede llegar a la cuenta y
+        // la ventana tiene que estar para contarlo.
+        canPop: !_guardando,
+        child: Form(
+          key: _form,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Espacio.xl,
+              0,
+              Espacio.xl,
+              Espacio.xl,
             ),
-            const SizedBox(height: Espacio.lg),
-            Campo(
-              etiqueta: 'Nueva',
-              controlador: _nueva,
-              oculto: true,
-              ayuda: 'Al menos 4 caracteres.',
-              textoAccion: TextInputAction.next,
-              validador: Valida.todos([
-                Valida.obligatorio('la contraseña nueva'),
-                Valida.minimo(4, 'La contraseña'),
-              ]),
-            ),
-            const SizedBox(height: Espacio.lg),
-            Campo(
-              etiqueta: 'Repetir la nueva',
-              controlador: _repetir,
-              oculto: true,
-              textoAccion: TextInputAction.done,
-              onEnviar: (_) => _guardar(),
-              validador: (valor) =>
-                  valor == _nueva.text ? null : 'No coincide con la nueva.',
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: Espacio.lg),
-              Text(
-                _error!,
-                style: const TextStyle(
-                  color: Tono.vino,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Campo(
+                  etiqueta: 'Contraseña actual',
+                  controlador: _actual,
+                  oculto: true,
+                  autofoco: true,
+                  textoAccion: TextInputAction.next,
+                  validador: Valida.obligatorio('la contraseña actual'),
                 ),
-              ),
-            ],
-            const SizedBox(height: Espacio.xl),
-            FilledButton(
-              onPressed: _guardando ? null : _guardar,
-              child: const Text('Cambiar contraseña'),
+                const SizedBox(height: Espacio.lg),
+                Campo(
+                  etiqueta: 'Nueva',
+                  controlador: _nueva,
+                  oculto: true,
+                  ayuda: 'Al menos $kMinimoClave caracteres.',
+                  textoAccion: TextInputAction.next,
+                  validador: Valida.todos([
+                    Valida.obligatorio('la contraseña nueva'),
+                    Valida.minimo(kMinimoClave, 'La contraseña'),
+                  ]),
+                ),
+                const SizedBox(height: Espacio.lg),
+                Campo(
+                  etiqueta: 'Repetir la nueva',
+                  controlador: _repetir,
+                  oculto: true,
+                  textoAccion: TextInputAction.done,
+                  onEnviar: (_) => _guardar(),
+                  validador: (valor) =>
+                      valor == _nueva.text ? null : 'No coincide con la nueva.',
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: Espacio.lg),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: Tono.vino,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: Espacio.xl),
+                FilledButton(
+                  onPressed: _guardando ? null : _guardar,
+                  child: _guardando
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Cambiar contraseña'),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
         ),
       );
 }

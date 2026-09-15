@@ -14,7 +14,7 @@ import '../utils/validacion.dart';
 /// Valida con `AutovalidateMode.onUserInteraction`: **no se pinta de rojo
 /// antes de que la persona toque el campo**, pero una vez que lo tocó corrige
 /// en vivo, sin esperar a que apriete Guardar para enterarse.
-class Campo extends StatelessWidget {
+class Campo extends StatefulWidget {
   const Campo({
     super.key,
     required this.etiqueta,
@@ -55,6 +55,10 @@ class Campo extends StatelessWidget {
 
   /// Contraseñas. Con el teclado del celular a la vista, alguien parado al
   /// lado lee la pantalla entera.
+  ///
+  /// Trae su propio ojo para mostrarla: tipear a ciegas en un teclado chico
+  /// es equivocarse sin saber dónde. Si se pasa un [sufijo], ese reemplaza
+  /// al ojo.
   final bool oculto;
 
   /// Marca el campo como opcional en la etiqueta. Es más honesto que poner un
@@ -76,14 +80,23 @@ class Campo extends StatelessWidget {
   final TextInputAction? textoAccion;
 
   @override
+  State<Campo> createState() => _CampoState();
+}
+
+class _CampoState extends State<Campo> {
+  bool _ver = false;
+
+  @override
   Widget build(BuildContext context) {
+    final w = widget;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(etiqueta.toUpperCase(), style: Tipo.etiqueta),
-            if (opcional) ...[
+            Text(w.etiqueta.toUpperCase(), style: Tipo.etiqueta),
+            if (w.opcional) ...[
               const SizedBox(width: Espacio.sm),
               Text(
                 'OPCIONAL',
@@ -97,38 +110,49 @@ class Campo extends StatelessWidget {
         ),
         const SizedBox(height: Espacio.sm),
         TextFormField(
-          controller: controlador,
-          enabled: habilitado,
-          autofocus: autofoco,
-          obscureText: oculto,
-          keyboardType: lineas > 1 ? TextInputType.multiline : teclado,
-          inputFormatters: formateadores,
-          minLines: lineas,
-          maxLines: lineas,
-          textInputAction: textoAccion,
-          onChanged: onCambio,
-          onFieldSubmitted: onEnviar,
-          validator: validador,
+          controller: w.controlador,
+          enabled: w.habilitado,
+          autofocus: w.autofoco,
+          obscureText: w.oculto && !_ver,
+          keyboardType: w.lineas > 1 ? TextInputType.multiline : w.teclado,
+          inputFormatters: w.formateadores,
+          minLines: w.lineas,
+          maxLines: w.lineas,
+          textInputAction: w.textoAccion,
+          onChanged: w.onCambio,
+          onFieldSubmitted: w.onEnviar,
+          validator: w.validador,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           style: Tipo.cuerpo,
           decoration: InputDecoration(
-            hintText: ejemplo,
-            helperText: ayuda,
+            hintText: w.ejemplo,
+            helperText: w.ayuda,
             helperStyle: Tipo.nota,
             helperMaxLines: 3,
             errorMaxLines: 3,
-            prefixIcon: prefijo,
-            prefixText: prefijoTexto,
+            prefixIcon: w.prefijo,
+            prefixText: w.prefijoTexto,
             prefixStyle: Tipo.cuerpo.copyWith(color: Tono.texto2),
-            suffixIcon: sufijo,
+            suffixIcon: w.sufijo ?? (w.oculto ? _ojo() : null),
             // Blanco cuando se puede escribir, hueso cuando no: el campo
             // bloqueado tiene que verse apagado, no solo no responder.
-            fillColor: habilitado ? Tono.fondo : Tono.fondo2,
+            fillColor: w.habilitado ? Tono.fondo : Tono.fondo2,
           ),
         ),
       ],
     );
   }
+
+  /// El ojo tachado mientras se ve: el ícono muestra lo que pasa al tocarlo.
+  Widget _ojo() => IconButton(
+        onPressed: () => setState(() => _ver = !_ver),
+        tooltip: _ver ? 'Ocultar contraseña' : 'Mostrar contraseña',
+        icon: Icon(
+          _ver ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+          size: 21,
+          color: Tono.texto3,
+        ),
+      );
 }
 
 /// Solo dígitos: pegar `20-13a1` deja `20131`.

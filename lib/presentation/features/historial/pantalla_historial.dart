@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:printing/printing.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/theme/tipografia.dart';
@@ -13,6 +12,7 @@ import '../../../core/widgets/foto.dart';
 import '../../../core/widgets/hoja.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../../domain/repositories/trabajos_repository.dart';
+import '../../comunes/salida_pdf.dart';
 import '../shell/barra_inferior.dart';
 import '../documento/pantalla_documento.dart';
 import '../trabajo/wizard_trabajo.dart';
@@ -139,13 +139,33 @@ class _PantallaHistorialState extends ConsumerState<PantallaHistorial> {
               label: Text(t.estaTerminado ? 'Editar' : 'Seguir cargando'),
             ),
             const SizedBox(height: Espacio.md),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(hoja).pop();
-                _descargar(t);
-              },
-              icon: const Icon(Icons.download_rounded, size: 19),
-              label: const Text('Descargar PDF'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(hoja).pop();
+                    _sacarPdf(t, compartir: false);
+                  },
+                  icon: const Icon(Icons.download_rounded, size: 19),
+                  label: const Text('Descargar PDF'),
+                ),
+                Container(
+                  width: 1,
+                  height: 22,
+                  margin: const EdgeInsets.symmetric(horizontal: Espacio.sm),
+                  color: Tono.linea,
+                ),
+                IconButton(
+                  onPressed: () {
+                    Navigator.of(hoja).pop();
+                    _sacarPdf(t, compartir: true);
+                  },
+                  tooltip: 'Compartir',
+                  color: Tono.vinoTexto,
+                  icon: const Icon(Icons.share_rounded, size: 20),
+                ),
+              ],
             ),
           ],
         ),
@@ -173,15 +193,22 @@ class _PantallaHistorialState extends ConsumerState<PantallaHistorial> {
     }
   }
 
-  Future<void> _descargar(Trabajo t) async {
+  /// Descargar lo deja en el teléfono; compartir abre la hoja del sistema.
+  Future<void> _sacarPdf(Trabajo t, {required bool compartir}) async {
     try {
       final bytes = await ref
           .read(generadorPdfProvider)
           .completo(t, ref.read(negocioProvider));
-      await Printing.sharePdf(bytes: bytes, filename: '${t.codigo}.pdf');
+      final nombre = '${t.codigo}.pdf';
+
+      if (compartir) {
+        await compartirPdf(bytes, nombre);
+      } else if (mounted) {
+        await descargarPdf(context, bytes, nombre);
+      }
     } catch (e) {
       if (mounted) {
-        mostrarAviso(context, 'No se pudo generar el PDF: $e', problema: true);
+        mostrarAviso(context, 'No se pudo sacar el PDF: $e', problema: true);
       }
     }
   }

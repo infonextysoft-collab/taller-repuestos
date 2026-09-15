@@ -26,61 +26,98 @@ class FiltroChips<T> extends StatelessWidget {
     required this.valor,
     required this.opciones,
     required this.onCambio,
+    this.compactos = false,
   });
 
   final T valor;
   final List<OpcionChip<T>> opciones;
   final ValueChanged<T> onCambio;
 
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: opciones.length,
-          separatorBuilder: (_, _) => const SizedBox(width: Espacio.sm),
-          itemBuilder: (context, i) {
-            final o = opciones[i];
-            final activo = o.valor == valor;
+  /// Para cuando la fila comparte el ancho con un botón y las opciones son
+  /// pocas: menos aire a los lados y, en vez de desplazarse, **se achica lo
+  /// justo para entrar entera**.
+  ///
+  /// Desplazarse sirve con seis vistas, no con tres: en un teléfono de 360
+  /// puntos con contadores de dos cifras, el último chip quedaba cortado
+  /// debajo del botón, y "Agotados" es justo el que más se busca. Achicarse
+  /// ahí es un 5 %, que no se nota; y con letra grande de accesibilidad sigue
+  /// entrando todo en vez de esconder una opción.
+  final bool compactos;
 
-            return GestureDetector(
-              onTap: () => onCambio(o.valor),
-              child: AnimatedContainer(
-                duration: duracion(context, Movimiento.micro),
-                curve: Movimiento.salida,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: Espacio.lg),
-                decoration: BoxDecoration(
-                  color: activo ? Tono.vino : Tono.fondo,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      o.texto,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: activo ? Colors.white : Tono.texto2,
-                      ),
-                    ),
-                    if (o.cantidad != null) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        '${o.cantidad}',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          fontFeatures: kNumerosTabulares,
-                          color: activo ? Tono.oroClaro : Tono.texto3,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
+  @override
+  Widget build(BuildContext context) {
+    if (compactos) {
+      return SizedBox(
+        height: 38,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < opciones.length; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                SizedBox(height: 38, child: _chip(context, opciones[i])),
+              ],
+            ],
+          ),
         ),
       );
+    }
+
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: opciones.length,
+        separatorBuilder: (_, _) => const SizedBox(width: Espacio.sm),
+        itemBuilder: (context, i) => _chip(context, opciones[i]),
+      ),
+    );
+  }
+
+  Widget _chip(BuildContext context, OpcionChip<T> o) {
+    final activo = o.valor == valor;
+
+    return GestureDetector(
+      onTap: () => onCambio(o.valor),
+      child: AnimatedContainer(
+        duration: duracion(context, Movimiento.micro),
+        curve: Movimiento.salida,
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(
+          horizontal: compactos ? 10 : Espacio.lg,
+        ),
+        decoration: BoxDecoration(
+          color: activo ? Tono.vino : Tono.fondo,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              o.texto,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: activo ? Colors.white : Tono.texto2,
+              ),
+            ),
+            if (o.cantidad != null) ...[
+              const SizedBox(width: 6),
+              Text(
+                '${o.cantidad}',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: kNumerosTabulares,
+                  color: activo ? Tono.oroClaro : Tono.texto3,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

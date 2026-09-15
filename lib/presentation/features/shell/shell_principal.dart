@@ -11,6 +11,7 @@ import '../inventario/pantalla_inventario.dart';
 import '../negocio/formulario_clave.dart';
 import '../negocio/pantalla_negocio.dart';
 import '../negocio/pantalla_respaldo.dart';
+import '../negocio/ventana_correo.dart';
 import '../recordatorios/pantalla_recordatorios.dart';
 import '../trabajo/wizard_trabajo.dart';
 import '../venta/pantalla_venta_simple.dart';
@@ -106,14 +107,39 @@ class _ShellPrincipalState extends ConsumerState<ShellPrincipal> {
           MaterialPageRoute(builder: (_) => const PantallaRespaldo()),
         );
 
+      case AccionNegocio.correo:
+        final cambiarClave = await mostrarHoja<bool>(
+          context,
+          titulo: 'Recuperación por correo',
+          bajada: 'Si olvidas la contraseña, te mandamos un enlace a tu correo.',
+          contenido: (hoja) => VentanaCorreo(
+            onListo: () => Navigator.of(hoja).pop(),
+            onCambiarClave: () => Navigator.of(hoja).pop(true),
+          ),
+        );
+        // Se invalida al cerrar y no desde adentro: así la ventana no cambia
+        // de cara mientras se va. Si el armazón ya no está —la sesión venció
+        // con la ventana abierta—, la ventana lo avisó sola.
+        if (!mounted) return;
+        ref.invalidate(estadoCuentaProvider);
+        if (cambiarClave == true) {
+          await _accionNegocio(AccionNegocio.clave);
+        }
+
       case AccionNegocio.clave:
+        final conCorreo =
+            ref.read(estadoCuentaProvider).valueOrNull?.conCorreo ?? false;
         await mostrarHoja<void>(
           context,
           titulo: 'Cambiar contraseña',
-          bajada: 'Hace falta la actual para poder cambiarla.',
+          bajada: conCorreo
+              ? 'Es la de tu cuenta de correo: hace falta la actual y '
+                  'conexión a internet.'
+              : 'Hace falta la actual para poder cambiarla.',
           contenido: (hoja) =>
               FormularioClave(onListo: () => Navigator.of(hoja).pop()),
         );
+        if (mounted) ref.invalidate(estadoCuentaProvider);
 
       case AccionNegocio.salir:
         final seguro = await confirmar(

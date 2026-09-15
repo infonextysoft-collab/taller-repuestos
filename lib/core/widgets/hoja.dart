@@ -111,7 +111,9 @@ class _Ventana extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    // maybePop y no pop: así una ventana que está guardando
+                    // puede negarse a cerrar, igual que al tocar afuera.
+                    onPressed: () => Navigator.of(context).maybePop(),
                     tooltip: 'Cerrar',
                     iconSize: 20,
                     color: Tono.texto2,

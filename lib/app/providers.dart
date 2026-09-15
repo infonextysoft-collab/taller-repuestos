@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/cuenta/cuenta_remota.dart';
 import '../data/documentos/generador_pdf.dart';
 import '../data/fotos/servicio_fotos.dart';
 import '../data/local/app_database.dart';
@@ -52,8 +53,26 @@ final respaldoRepoProvider = Provider<RespaldoRepository>(
   (ref) => RespaldoZip(ref.watch(baseDatosProvider)),
 );
 
+/// La cuenta de correo para recuperar la contraseña.
+///
+/// Por defecto no hay: así arrancan los tests y la vista web. En el celular la
+/// pone `main()`, si Firebase arrancó.
+final cuentaRemotaProvider = Provider<CuentaRemota>(
+  (ref) => const CuentaNoDisponible(),
+);
+
 final authRepoProvider = Provider<AuthRepository>(
-  (ref) => AuthRepositorySqlite(ref.watch(baseDatosProvider)),
+  (ref) => AuthRepositorySqlite(
+    ref.watch(baseDatosProvider),
+    ref.watch(cuentaRemotaProvider),
+  ),
+);
+
+/// Cómo está el acceso: si hay correo vinculado y si sigue la contraseña de
+/// fábrica. Lo mira el menú del negocio; se invalida al cambiar cualquiera de
+/// las dos cosas.
+final estadoCuentaProvider = FutureProvider<EstadoCuenta>(
+  (ref) => ref.watch(authRepoProvider).estado(),
 );
 
 /// Quien dibuja el papel. No tiene estado: una sola instancia alcanza.
