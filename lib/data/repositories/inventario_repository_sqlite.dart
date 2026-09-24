@@ -85,11 +85,12 @@ class InventarioRepositorySqlite implements InventarioRepository {
     required String desc,
     required int cant,
     double? precio,
+    double? costo,
   }) async {
     final cantidad = cant < 0 ? 0 : cant;
 
     if (inventarioId == null || cantidad == 0) {
-      return ResultadoLineas([_externa(desc, cantidad, precio ?? 0)]);
+      return ResultadoLineas([_externa(desc, cantidad, precio ?? 0, costo)]);
     }
 
     return _db.transaction((txn) async {
@@ -98,7 +99,7 @@ class InventarioRepositorySqlite implements InventarioRepository {
 
       // El repuesto se borró del inventario mientras estaba abierto el selector.
       if (filas.isEmpty) {
-        return ResultadoLineas([_externa(desc, cantidad, precio ?? 0)]);
+        return ResultadoLineas([_externa(desc, cantidad, precio ?? 0, costo)]);
       }
 
       final item = Repuesto.fromRow(filas.first);
@@ -106,6 +107,8 @@ class InventarioRepositorySqlite implements InventarioRepository {
       final deInventario = cantidad < disponible ? cantidad : disponible;
       final externo = cantidad - deInventario;
       final precioLinea = precio ?? item.precio;
+      // Cero en el repuesto es "no se cargó", no "es gratis".
+      final costoLinea = item.precioCosto > 0 ? item.precioCosto : costo;
 
       final lineas = <LineaRepuesto>[];
 
@@ -118,11 +121,15 @@ class InventarioRepositorySqlite implements InventarioRepository {
           precio: precioLinea,
           origen: OrigenRepuesto.inventario,
           inventarioId: item.id,
+          costo: costoLinea,
         ));
       }
 
+      // Al resto que se compra afuera se le pone el mismo costo: es el mismo
+      // repuesto, y lo que vale para el taller es lo que el taller anotó. Si
+      // no hay costo cargado queda en blanco, y la ganancia lo avisa.
       if (externo > 0) {
-        lineas.add(_externa(item.nombre, externo, precioLinea));
+        lineas.add(_externa(item.nombre, externo, precioLinea, costoLinea));
       }
 
       final aviso = externo == 0
@@ -170,9 +177,11 @@ class InventarioRepositorySqlite implements InventarioRepository {
     }
   }
 
-  LineaRepuesto _externa(String desc, int cant, double precio) => LineaRepuesto(
+  LineaRepuesto _externa(String desc, int cant, double precio, double? costo) =>
+      LineaRepuesto(
         desc: desc.trim(),
         cantidad: cant,
         precio: precio,
+        costo: costo,
       );
 }

@@ -43,11 +43,15 @@ abstract class InventarioRepository {
   /// - Con stock suficiente → una línea de inventario, se descuenta.
   /// - Con stock insuficiente → **se divide sola**: una línea de inventario
   ///   con todo lo disponible + una línea externa con el resto, más un aviso.
+  ///
+  /// El `costo` solo hace falta para lo externo: lo que sale del inventario
+  /// ya sabe lo que costó y se copia del repuesto.
   Future<ResultadoLineas> agregarRepuesto({
     int? inventarioId,
     required String desc,
     required int cant,
     double? precio,
+    double? costo,
   });
 
   /// Deshace una línea: si era de inventario devuelve la cantidad al stock.

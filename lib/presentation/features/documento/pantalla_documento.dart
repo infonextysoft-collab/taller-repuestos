@@ -116,16 +116,16 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
 
     try {
       final t = _trabajo!;
-      final bytes = await ref
-          .read(generadorPdfProvider)
-          .completo(t, ref.read(negocioProvider));
+      final negocio = ref.read(negocioProvider);
+      final bytes = await ref.read(generadorPdfProvider).completo(t, negocio);
       final nombre = '${t.codigo}.pdf';
 
       switch (salida) {
         case _Salida.descargar:
           if (mounted) await descargarPdf(context, bytes, nombre);
         case _Salida.compartir:
-          await compartirPdf(bytes, nombre);
+          await compartirPdf(bytes, nombre,
+              mensaje: mensajeDeEnvio(t, negocio));
       }
     } catch (e) {
       if (mounted) {
@@ -146,6 +146,7 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
 
     final pestanas = _pestanas;
     final activa = _pestana.clamp(0, pestanas.length - 1);
+    final conPago = ref.watch(negocioProvider).datosPago.isNotEmpty;
 
     return Scaffold(
       backgroundColor: Tono.fondo2,
@@ -242,43 +243,59 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.all(Espacio.lg),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _enCurso != null
-                        ? null
-                        : () => _sacar(_Salida.descargar),
-                    icon: _enCurso == _Salida.descargar
-                        ? const _Girando(color: Colors.white)
-                        : const Icon(Icons.download_rounded, size: 20),
-                    label: Text(
-                      _enCurso == _Salida.descargar
-                          ? 'Generando…'
-                          : 'Descargar PDF',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: Espacio.md),
-                SizedBox(
-                  width: 54,
-                  height: 54,
-                  child: Tooltip(
-                    message: 'Compartir',
-                    child: OutlinedButton(
-                      onPressed: _enCurso != null
-                          ? null
-                          : () => _sacar(_Salida.compartir),
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        foregroundColor: Tono.vino,
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _enCurso != null
+                            ? null
+                            : () => _sacar(_Salida.descargar),
+                        icon: _enCurso == _Salida.descargar
+                            ? const _Girando(color: Colors.white)
+                            : const Icon(Icons.download_rounded, size: 20),
+                        label: Text(
+                          _enCurso == _Salida.descargar
+                              ? 'Generando…'
+                              : 'Descargar PDF',
+                        ),
                       ),
-                      child: _enCurso == _Salida.compartir
-                          ? const _Girando(color: Tono.vino)
-                          : const Icon(Icons.share_rounded, size: 22),
                     ),
-                  ),
+                    const SizedBox(width: Espacio.md),
+                    SizedBox(
+                      width: 54,
+                      height: 54,
+                      child: Tooltip(
+                        message: 'Compartir',
+                        child: OutlinedButton(
+                          onPressed: _enCurso != null
+                              ? null
+                              : () => _sacar(_Salida.compartir),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            foregroundColor: Tono.vino,
+                          ),
+                          child: _enCurso == _Salida.compartir
+                              ? const _Girando(color: Tono.vino)
+                              : const Icon(Icons.share_rounded, size: 22),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                // Se avisa porque no se ve: el texto queda copiado aunque
+                // WhatsApp lo descarte al mandar el PDF.
+                if (conPago) ...[
+                  const SizedBox(height: Espacio.md),
+                  Text(
+                    'Compartir copia tus datos de pago para pegarlos en el '
+                    'chat.',
+                    textAlign: TextAlign.center,
+                    style: Tipo.nota,
+                  ),
+                ],
               ],
             ),
           ),

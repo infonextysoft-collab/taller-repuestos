@@ -12,6 +12,7 @@ import '../../../core/widgets/foto.dart';
 import '../../../core/widgets/hoja.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../../domain/repositories/trabajos_repository.dart';
+import '../../../domain/services/ganancia.dart';
 import '../../comunes/salida_pdf.dart';
 import '../shell/barra_inferior.dart';
 import '../documento/pantalla_documento.dart';
@@ -196,13 +197,12 @@ class _PantallaHistorialState extends ConsumerState<PantallaHistorial> {
   /// Descargar lo deja en el teléfono; compartir abre la hoja del sistema.
   Future<void> _sacarPdf(Trabajo t, {required bool compartir}) async {
     try {
-      final bytes = await ref
-          .read(generadorPdfProvider)
-          .completo(t, ref.read(negocioProvider));
+      final negocio = ref.read(negocioProvider);
+      final bytes = await ref.read(generadorPdfProvider).completo(t, negocio);
       final nombre = '${t.codigo}.pdf';
 
       if (compartir) {
-        await compartirPdf(bytes, nombre);
+        await compartirPdf(bytes, nombre, mensaje: mensajeDeEnvio(t, negocio));
       } else if (mounted) {
         await descargarPdf(context, bytes, nombre);
       }
@@ -507,9 +507,29 @@ class _ResumenHoja extends StatelessWidget {
   final Trabajo trabajo;
 
   @override
-  Widget build(BuildContext context) => Panel(
-        color: Tono.fondo2,
-        child: Row(
+  Widget build(BuildContext context) {
+    final ganancia = gananciaDe(trabajo);
+
+    return Panel(
+      color: Tono.fondo2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _encabezado(),
+          // Solo con algo cobrado: "ganaste S/ 0.00" en un registro a medias
+          // no es un dato, es ruido.
+          if (ganancia.cobrado > 0) ...[
+            const SizedBox(height: Espacio.md),
+            const Divider(height: 1, color: Tono.linea),
+            const SizedBox(height: Espacio.md),
+            _Ganancia(ganancia: ganancia),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _encabezado() => Row(
           children: [
             Expanded(
               child: Column(
@@ -538,6 +558,53 @@ class _ResumenHoja extends StatelessWidget {
             const SizedBox(width: Espacio.md),
             Text(soles(trabajo.totales.total), style: Tipo.montoGrande),
           ],
+        );
+}
+
+/// Cuánto quedó después de reponer los repuestos.
+///
+/// Si alguna línea no dice lo que costó, se avisa **con el número**: no es lo
+/// mismo dudar de uno que de siete, y sin esa cuenta la ganancia parece
+/// exacta cuando en realidad es un techo.
+class _Ganancia extends StatelessWidget {
+  const _Ganancia({required this.ganancia});
+
+  final Ganancia ganancia;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = ganancia;
+    final faltan = g.sinCosto;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                g.completa ? 'Ganancia' : 'Ganancia, como mucho',
+                style: Tipo.secundario,
+              ),
+            ),
+            Text(
+              soles(g.neta),
+              style: Tipo.monto.copyWith(
+                color: g.neta < 0 ? Tono.vino : Tono.oroTexto,
+              ),
+            ),
+          ],
         ),
-      );
+        if (!g.completa) ...[
+          const SizedBox(height: Espacio.xs),
+          Text(
+            faltan == 1
+                ? 'Hay 1 repuesto sin costo registrado.'
+                : 'Hay $faltan repuestos sin costo registrado.',
+            style: Tipo.nota,
+          ),
+        ],
+      ],
+    );
+  }
 }

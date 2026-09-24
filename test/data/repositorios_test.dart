@@ -266,4 +266,57 @@ void main() {
           EstadoRecordatorio.cumplido);
     });
   });
+
+  group('el costo viaja a la linea', () {
+    test('lo que sale del inventario se lleva su precio de compra', () async {
+      final id = await inventario.crear(const Repuesto(
+          nombre: 'FILTRO', stock: 5, precio: 40, precioCosto: 25));
+
+      final r = await inventario.agregarRepuesto(
+          inventarioId: id, desc: 'FILTRO', cant: 2);
+
+      expect(r.lineas.single.costo, 25);
+      expect(r.lineas.single.costoTotal, 50);
+    });
+
+    test('un repuesto sin precio de compra deja la linea en blanco', () async {
+      final id = await inventario
+          .crear(const Repuesto(nombre: 'FAJA', stock: 5, precio: 40));
+
+      final r = await inventario.agregarRepuesto(
+          inventarioId: id, desc: 'FAJA', cant: 1);
+
+      expect(r.lineas.single.costo, isNull,
+          reason: 'cero en el repuesto es "no se sabe", no "es gratis"');
+      expect(r.lineas.single.costoTotal, isNull);
+    });
+
+    test('al dividirse, las dos partes llevan el mismo costo', () async {
+      final id = await inventario.crear(const Repuesto(
+          nombre: 'BUJIA', stock: 2, precio: 30, precioCosto: 18));
+
+      final r = await inventario.agregarRepuesto(
+          inventarioId: id, desc: 'BUJIA', cant: 5);
+
+      expect(r.lineas.length, 2);
+      expect(r.lineas.first.costo, 18);
+      expect(r.lineas.last.costo, 18,
+          reason: 'lo que se compra afuera es el mismo repuesto');
+    });
+
+    test('un externo se queda con el costo que le pasaron', () async {
+      final r = await inventario.agregarRepuesto(
+          desc: 'Junta hecha a mano', cant: 3, precio: 15, costo: 9);
+
+      expect(r.lineas.single.origen, OrigenRepuesto.externo);
+      expect(r.lineas.single.costoTotal, 27);
+    });
+
+    test('un externo sin costo no inventa ninguno', () async {
+      final r = await inventario
+          .agregarRepuesto(desc: 'Junta', cant: 1, precio: 15);
+
+      expect(r.lineas.single.costo, isNull);
+    });
+  });
 }

@@ -7,9 +7,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:taller_repuestos/core/utils/clave_segura.dart';
 import 'package:taller_repuestos/core/utils/imagenes.dart';
 import 'package:taller_repuestos/data/local/app_database.dart';
+import 'package:taller_repuestos/data/repositories/compras_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/inventario_repository_sqlite.dart';
+import 'package:taller_repuestos/data/repositories/negocio_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/recordatorios_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/trabajos_repository_sqlite.dart';
+import 'package:taller_repuestos/domain/entities/compra.dart';
 import 'package:taller_repuestos/domain/entities/repeticion.dart';
 
 /// Abrir una base que ya existe.
@@ -234,6 +237,84 @@ void main() {
     expect(fila['usuario'], usuarioInicial);
     expect(fila['clave'], '');
     expect(fila['claveHuella'], isNull);
+  });
+
+  test('el negocio gana con qué cobrar sin perder lo que ya tenía', () async {
+    final ruta = await baseVieja(_esquemaWeb, (d) async {
+      await d.insert('negocio', {
+        'id': 1,
+        'nombre': 'Servicios MS',
+        'ruc': '20131312955',
+        'telefono': '999888777',
+      });
+      await d.insert('auth', {'id': 1, 'usuario': 'Samuel', 'clave': 'Clave99'});
+    });
+
+    final base = await AppDatabase.abrirEn(databaseFactoryFfi, ruta);
+    addTearDown(base.cerrar);
+    final negocio = NegocioRepositorySqlite(base);
+
+    final antes = await negocio.obtener();
+    expect(antes.nombre, 'Servicios MS');
+    expect(antes.telefono, '999888777');
+    expect(antes.datosPago, isEmpty, reason: 'nace sin datos de cobro');
+
+    await negocio.guardar(
+      antes.copyWith(banco: 'BCP', cuenta: '191-0123456-0-12'),
+    );
+
+    final despues = await negocio.obtener();
+    expect(despues.datosPago.single.valor, '191-0123456-0-12');
+    expect(despues.nombre, 'Servicios MS');
+  });
+
+  test('el inventario gana el precio de compra sin tocar lo que vale',
+      () async {
+    final ruta = await baseVieja(_esquemaWeb, (d) async {
+      await d.insert('inventario', {
+        'nombre': 'MOTOR',
+        'stock': 3,
+        'precio': 100.0,
+      });
+      await d.insert('auth', {'id': 1, 'usuario': 'Samuel', 'clave': 'Clave99'});
+    });
+
+    final base = await AppDatabase.abrirEn(databaseFactoryFfi, ruta);
+    addTearDown(base.cerrar);
+
+    final item = (await InventarioRepositorySqlite(base).listar()).single;
+    expect(item.nombre, 'MOTOR');
+    expect(item.stock, 3);
+    expect(item.precio, 100);
+    expect(item.precioCosto, 0);
+    expect(item.utilidad, isNull,
+        reason: 'lo cargado antes de este campo no sabe cuánto costó');
+  });
+
+  test('una base vieja estrena la tabla de compras, vacía y usable', () async {
+    final ruta = await baseVieja(_esquemaWeb, (d) async {
+      await d.insert('inventario', {'nombre': 'BUJIA', 'stock': 2, 'precio': 30.0});
+      await d.insert('auth', {'id': 1, 'usuario': 'Samuel', 'clave': 'Clave99'});
+    });
+
+    final base = await AppDatabase.abrirEn(databaseFactoryFfi, ruta);
+    addTearDown(base.cerrar);
+
+    final compras = ComprasRepositorySqlite(base);
+    expect(await compras.listar(), isEmpty);
+
+    final inventario = InventarioRepositorySqlite(base);
+    final id = (await inventario.listar()).single.id!;
+    await compras.registrar(Compra(
+      fecha: '2026-09-20',
+      proveedor: 'Don Pepe',
+      lineas: [
+        LineaCompra(desc: 'BUJIA', cantidad: 5, costo: 18, inventarioId: id),
+      ],
+    ));
+
+    expect((await inventario.obtener(id))!.stock, 7);
+    expect((await compras.listar()).single.proveedor, 'Don Pepe');
   });
 }
 

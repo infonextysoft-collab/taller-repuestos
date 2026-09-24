@@ -54,6 +54,7 @@ class LineaRepuesto implements LineaDocumento {
     required this.precio,
     this.origen = OrigenRepuesto.externo,
     this.inventarioId,
+    this.costo,
   });
 
   @override
@@ -65,6 +66,19 @@ class LineaRepuesto implements LineaDocumento {
 
   /// Solo tiene valor si [origen] es `inventario`.
   final int? inventarioId;
+
+  /// Lo que costó **esta** unidad, congelado al cargarla.
+  ///
+  /// Se guarda en la línea y no se lee del inventario a la hora de mostrar la
+  /// ganancia: si mañana sube el precio de compra, lo que se ganó ayer tiene
+  /// que quedarse quieto. `null` es "no se sabe" —repuesto externo sin costo,
+  /// o cargado antes de que existiera este campo—, y entonces la ganancia lo
+  /// dice en vez de suponer cero.
+  final double? costo;
+
+  /// Lo que costaron todas las unidades de la línea.
+  double? get costoTotal =>
+      costo == null ? null : redondear(cantidad * costo!);
 
   @override
   num get cant => cantidad;
@@ -81,6 +95,7 @@ class LineaRepuesto implements LineaDocumento {
     double? precio,
     OrigenRepuesto? origen,
     int? inventarioId,
+    double? costo,
   }) =>
       LineaRepuesto(
         desc: desc ?? this.desc,
@@ -88,6 +103,7 @@ class LineaRepuesto implements LineaDocumento {
         precio: precio ?? this.precio,
         origen: origen ?? this.origen,
         inventarioId: inventarioId ?? this.inventarioId,
+        costo: costo ?? this.costo,
       );
 
   Map<String, dynamic> toJson() => {
@@ -96,6 +112,7 @@ class LineaRepuesto implements LineaDocumento {
         'precio': precio,
         'origen': origen.name,
         'inventarioId': inventarioId,
+        'costo': costo,
       };
 
   factory LineaRepuesto.fromJson(Map<String, dynamic> j) => LineaRepuesto(
@@ -106,5 +123,6 @@ class LineaRepuesto implements LineaDocumento {
             ? OrigenRepuesto.inventario
             : OrigenRepuesto.externo,
         inventarioId: (j['inventarioId'] as num?)?.toInt(),
+        costo: (j['costo'] as num?)?.toDouble(),
       );
 }

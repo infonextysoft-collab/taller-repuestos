@@ -4,10 +4,15 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:path/path.dart' as p;
-import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../core/utils/dinero.dart';
 import '../../core/widgets/avisos.dart';
+import '../../domain/entities/negocio.dart';
+import '../../domain/entities/trabajo.dart';
 
 /// La carpeta pública de descargas del teléfono: la misma que abre la app
 /// "Archivos" en "Descargas".
@@ -51,8 +56,67 @@ Future<void> descargarPdf(
 }
 
 /// La hoja de compartir del sistema: WhatsApp, correo, Drive.
-Future<void> compartirPdf(Uint8List bytes, String nombre) =>
-    Printing.sharePdf(bytes: bytes, filename: nombre);
+///
+/// El [mensaje] viaja de dos maneras a propósito: como texto del envío **y al
+/// portapapeles**. No es redundancia — **WhatsApp descarta el texto cuando lo
+/// adjuntado es un PDF** (con fotos lo respeta como descripción, con
+/// documentos no), así que la única forma de que llegue al chat es pegarlo.
+/// Por eso los datos de pago también van impresos en la boleta: ese camino no
+/// depende de por dónde se mande.
+Future<void> compartirPdf(
+  Uint8List bytes,
+  String nombre, {
+  String mensaje = '',
+}) async {
+  final texto = mensaje.trim();
+  if (texto.isNotEmpty) {
+    await Clipboard.setData(ClipboardData(text: texto));
+  }
+
+  // En el navegador no hay disco donde dejarlo; en el teléfono se escribe un
+  // temporal para que el archivo llegue con su nombre y no con uno inventado.
+  final archivo = kIsWeb
+      ? XFile.fromData(bytes, mimeType: 'application/pdf')
+      : XFile(await _temporal(bytes, nombre), mimeType: 'application/pdf');
+
+  await SharePlus.instance.share(ShareParams(
+    files: [archivo],
+    fileNameOverrides: kIsWeb ? [nombre] : null,
+    text: texto.isEmpty ? null : texto,
+  ));
+}
+
+Future<String> _temporal(Uint8List bytes, String nombre) async {
+  final carpeta = await getTemporaryDirectory();
+  final archivo = File(p.join(carpeta.path, nombre));
+  await archivo.writeAsBytes(bytes, flush: true);
+  return archivo.path;
+}
+
+/// El mensaje que acompaña al documento: qué es, cuánto y a dónde pagar.
+///
+/// Sin datos de cobro cargados quedan las dos primeras líneas, que igual
+/// sirven de referencia en el chat.
+String mensajeDeEnvio(Trabajo t, Negocio n) {
+  final encabezado =
+      [n.nombre.trim(), t.codigo].where((s) => s.isNotEmpty).join(' · ');
+
+  final lineas = <String>[
+    if (encabezado.isNotEmpty) encabezado,
+    'Total: ${soles(t.totales.total)}',
+  ];
+
+  final pago = n.datosPago;
+  if (pago.isNotEmpty) {
+    lineas.add('');
+    lineas.add('Para el pago:');
+    for (final dato in pago) {
+      lineas.add('${dato.etiqueta}: ${dato.valor}');
+    }
+  }
+
+  return lineas.join('\n');
+}
 
 /// Escribe [bytes] en [carpeta] con [nombre], o con `nombre (1)`, `(2)`…
 /// si ya hay uno: **nunca pisa** un archivo que la persona ya tenía.

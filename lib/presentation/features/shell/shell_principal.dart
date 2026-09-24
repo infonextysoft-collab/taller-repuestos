@@ -7,12 +7,14 @@ import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/hoja.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../historial/pantalla_historial.dart';
+import '../inventario/pantalla_compras.dart';
 import '../inventario/pantalla_inventario.dart';
 import '../negocio/formulario_clave.dart';
 import '../negocio/pantalla_negocio.dart';
 import '../negocio/pantalla_respaldo.dart';
 import '../negocio/ventana_correo.dart';
 import '../recordatorios/pantalla_recordatorios.dart';
+import '../reportes/pantalla_reportes.dart';
 import '../trabajo/wizard_trabajo.dart';
 import '../venta/pantalla_venta_simple.dart';
 import 'barra_inferior.dart';
@@ -100,6 +102,18 @@ class _ShellPrincipalState extends ConsumerState<ShellPrincipal> {
       case AccionNegocio.datos:
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const PantallaNegocio()),
+        );
+
+      case AccionNegocio.compras:
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PantallaCompras()),
+        );
+        // Una compra sube stock: el inventario tiene que enterarse.
+        if (mounted) ref.read(refrescoInventarioProvider.notifier).state++;
+
+      case AccionNegocio.reportes:
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PantallaReportes()),
         );
 
       case AccionNegocio.respaldo:

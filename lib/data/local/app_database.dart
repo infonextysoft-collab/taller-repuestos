@@ -79,7 +79,16 @@ class AppDatabase {
   ///
   /// 3 → 4: la contraseña deja de guardarse tal cual —queda su huella— y la
   /// tabla gana el correo con el que se recupera.
-  static const int _version = 4;
+  ///
+  /// 4 → 5: el negocio guarda con qué le pagan —banco, cuenta, CCI, Yape—
+  /// para que salga al pie de la boleta.
+  ///
+  /// 5 → 6: el repuesto guarda a cuánto se compra, no solo a cuánto se vende.
+  /// Sin eso no hay forma de saber cuánto se gana.
+  ///
+  /// 6 → 7: aparecen las compras, que es de donde entra el stock y lo único
+  /// que sabe a quién y cuándo se le compró.
+  static const int _version = 7;
 
   @visibleForTesting
   static int get version => _version;
@@ -140,6 +149,24 @@ class AppDatabase {
       await _agregarColumna(d, 'auth', 'claveSal', 'TEXT');
       await _agregarColumna(d, 'auth', 'claveVueltas', 'INTEGER');
       await _protegerClaves(d);
+    }
+
+    if (desde < 5) {
+      const vacia = "TEXT NOT NULL DEFAULT ''";
+      await _agregarColumna(d, 'negocio', 'banco', vacia);
+      await _agregarColumna(d, 'negocio', 'cuenta', vacia);
+      await _agregarColumna(d, 'negocio', 'cci', vacia);
+      await _agregarColumna(d, 'negocio', 'yape', vacia);
+    }
+
+    if (desde < 6) {
+      await _agregarColumna(
+          d, 'inventario', 'precioCosto', 'REAL NOT NULL DEFAULT 0');
+    }
+
+    if (desde < 7 && !await _existeTabla(d, 'compras')) {
+      await d.execute(_tablaCompras);
+      await d.execute(_indiceCompras);
     }
   }
 
@@ -289,6 +316,22 @@ class AppDatabase {
   static const String _indiceFotos =
       'CREATE INDEX ix_fotos_trabajo ON fotos(trabajoId, momento, orden)';
 
+  /// Los renglones van como JSON en `detalle`, igual que los repuestos de un
+  /// trabajo. El total no se guarda: se suma de los renglones, y así nunca
+  /// puede contradecirlos.
+  static const String _tablaCompras = '''
+    CREATE TABLE compras (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha     TEXT NOT NULL,
+      proveedor TEXT NOT NULL DEFAULT '',
+      boleta    TEXT NOT NULL DEFAULT '',
+      detalle   TEXT NOT NULL DEFAULT '[]'
+    )
+  ''';
+
+  static const String _indiceCompras =
+      'CREATE INDEX ix_compras_fecha ON compras(fecha)';
+
   /// El esquema, en el orden en que se crea.
   ///
   /// Van sentencias sueltas y no un batch a propósito: esto corre una sola vez
@@ -338,6 +381,7 @@ class AppDatabase {
         nombre       TEXT    NOT NULL,
         stock        INTEGER NOT NULL DEFAULT 0,
         precio       REAL    NOT NULL DEFAULT 0,
+        precioCosto  REAL    NOT NULL DEFAULT 0,
         codigoBarras TEXT
       )
     ''',
@@ -366,6 +410,8 @@ class AppDatabase {
     'CREATE INDEX ix_rec_trabajo ON recordatorios(trabajoId)',
     _tablaFotos,
     _indiceFotos,
+    _tablaCompras,
+    _indiceCompras,
     '''
       CREATE TABLE negocio (
         id        INTEGER PRIMARY KEY,
@@ -373,7 +419,11 @@ class AppDatabase {
         ruc       TEXT NOT NULL DEFAULT '',
         direccion TEXT NOT NULL DEFAULT '',
         telefono  TEXT NOT NULL DEFAULT '',
-        email     TEXT NOT NULL DEFAULT ''
+        email     TEXT NOT NULL DEFAULT '',
+        banco     TEXT NOT NULL DEFAULT '',
+        cuenta    TEXT NOT NULL DEFAULT '',
+        cci       TEXT NOT NULL DEFAULT '',
+        yape      TEXT NOT NULL DEFAULT ''
       )
     ''',
     // `clave` queda siempre vacía: es la columna donde antes iba la contraseña

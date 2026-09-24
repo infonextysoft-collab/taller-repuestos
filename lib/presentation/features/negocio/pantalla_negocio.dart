@@ -35,6 +35,10 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
   final _direccion = TextEditingController();
   final _telefono = TextEditingController();
   final _email = TextEditingController();
+  final _banco = TextEditingController();
+  final _cuenta = TextEditingController();
+  final _cci = TextEditingController();
+  final _yape = TextEditingController();
 
   /// `null` = todavía no se eligió modo.
   ///
@@ -58,6 +62,10 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
     _direccion.dispose();
     _telefono.dispose();
     _email.dispose();
+    _banco.dispose();
+    _cuenta.dispose();
+    _cci.dispose();
+    _yape.dispose();
     super.dispose();
   }
 
@@ -67,6 +75,10 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
     _direccion.text = n.direccion;
     _telefono.text = n.telefono;
     _email.text = n.email;
+    _banco.text = n.banco;
+    _cuenta.text = n.cuenta;
+    _cci.text = n.cci;
+    _yape.text = n.yape;
   }
 
   Future<void> _guardar() async {
@@ -81,6 +93,10 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
           direccion: _direccion.text.trim(),
           telefono: _telefono.text.trim(),
           email: _email.text.trim(),
+          banco: _banco.text.trim(),
+          cuenta: _cuenta.text.trim(),
+          cci: _cci.text.trim(),
+          yape: _yape.text.trim(),
         ));
 
     if (!mounted) return;
@@ -161,6 +177,17 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
                     _Dato('Email', n.email, opcional: true),
                   ],
                 ),
+                const SizedBox(height: Espacio.xl),
+                Text('PARA COBRAR', style: Tipo.etiqueta),
+                const SizedBox(height: Espacio.md),
+                ListaAgrupada(
+                  filas: [
+                    _Dato('Banco', n.banco, opcional: true),
+                    _Dato('Cuenta', n.cuenta, opcional: true),
+                    _Dato('CCI', n.cci, opcional: true),
+                    _Dato('Yape / Plin', n.yape, opcional: true),
+                  ],
+                ),
               ],
             ),
           ),
@@ -229,6 +256,56 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
                     teclado: TextInputType.emailAddress,
                     textoAccion: TextInputAction.done,
                     validador: Valida.email(),
+                    onCambio: (_) => setState(() => _hayCambios = true),
+                  ),
+                  const SizedBox(height: Espacio.xxl),
+                  const Divider(height: 1),
+                  const SizedBox(height: Espacio.xxl),
+                  Text('PARA COBRAR', style: Tipo.etiqueta),
+                  const SizedBox(height: Espacio.sm),
+                  Text(
+                    'Sale al pie de la boleta y se copia al compartirla, para '
+                    'no tener que buscar el número cada vez. Lo que dejes '
+                    'vacío no se imprime.',
+                    style: Tipo.secundario,
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Banco',
+                    controlador: _banco,
+                    ejemplo: 'BCP, Interbank, BBVA…',
+                    opcional: true,
+                    textoAccion: TextInputAction.next,
+                    onCambio: (_) => setState(() => _hayCambios = true),
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Número de cuenta',
+                    controlador: _cuenta,
+                    ejemplo: '191-0123456-0-12',
+                    opcional: true,
+                    textoAccion: TextInputAction.next,
+                    onCambio: (_) => setState(() => _hayCambios = true),
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'CCI',
+                    controlador: _cci,
+                    ejemplo: '00219100123456012',
+                    ayuda: 'El interbancario: sin él no te pueden transferir '
+                        'desde otro banco.',
+                    opcional: true,
+                    textoAccion: TextInputAction.next,
+                    onCambio: (_) => setState(() => _hayCambios = true),
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Yape / Plin',
+                    controlador: _yape,
+                    ejemplo: '999888777',
+                    teclado: TextInputType.phone,
+                    opcional: true,
+                    textoAccion: TextInputAction.done,
                     onCambio: (_) => setState(() => _hayCambios = true),
                     onEnviar: (_) => _guardar(),
                   ),

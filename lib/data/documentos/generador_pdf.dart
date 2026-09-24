@@ -591,6 +591,21 @@ class GeneradorPdf {
       ),
     ));
 
+    // Con qué pagar, al pie y no en la cabecera: recién acá el cliente ya
+    // sabe cuánto debe. Va impreso en el papel a propósito —y no solo en el
+    // mensaje con que se manda— porque WhatsApp descarta el texto cuando lo
+    // que se adjunta es un PDF, y así los datos viajan igual.
+    final pago = negocio.datosPago;
+    if (pago.isNotEmpty) {
+      bloques.add(pw.SizedBox(height: 6 * _mm));
+      agregar(_tablaDatos(
+        'Para el pago',
+        [
+          for (final dato in pago) [dato.etiqueta, dato.valor],
+        ],
+      ));
+    }
+
     return bloques;
   }
 }

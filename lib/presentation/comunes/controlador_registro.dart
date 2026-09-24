@@ -145,6 +145,9 @@ class ControladorRegistro extends ChangeNotifier {
       desc: linea.desc,
       cant: 1,
       precio: linea.precio,
+      // Si es externo, el costo solo lo sabe la línea que ya está: no se
+      // vuelve a preguntar por sumar una unidad.
+      costo: linea.costo,
     );
     agregarRepuestos(resultado.lineas);
     return resultado.aviso;

@@ -4,11 +4,13 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taller_repuestos/data/local/app_database.dart';
+import 'package:taller_repuestos/data/repositories/compras_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/inventario_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/negocio_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/recordatorios_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/trabajos_repository_sqlite.dart';
 import 'package:taller_repuestos/data/respaldo/respaldo_zip.dart';
+import 'package:taller_repuestos/domain/entities/compra.dart';
 import 'package:taller_repuestos/domain/entities/foto.dart';
 import 'package:taller_repuestos/domain/entities/linea.dart';
 import 'package:taller_repuestos/domain/entities/negocio.dart';
@@ -65,6 +67,13 @@ void main() {
       fecha: '2026-12-10',
       importante: true,
     ));
+
+    await ComprasRepositorySqlite(base).registrar(const Compra(
+      fecha: '2026-09-05',
+      proveedor: 'Repuestos Lima',
+      boleta: 'B001-1234',
+      lineas: [LineaCompra(desc: 'Filtro de aceite', cantidad: 10, costo: 22)],
+    ));
   }
 
   test('exportar y restaurar en una base vacía devuelve todo', () async {
@@ -97,6 +106,14 @@ void main() {
         'Servicios MS');
     expect((await RecordatoriosRepositorySqlite(otra).listar()).single.importante,
         isTrue);
+
+    // Sin esto, restaurar en un teléfono nuevo perdería de quién vino cada
+    // cosa: el inventario volvería con el stock pero sin su historia.
+    final compra = (await ComprasRepositorySqlite(otra).listar()).single;
+    expect(compra.proveedor, 'Repuestos Lima');
+    expect(compra.boleta, 'B001-1234');
+    expect(compra.lineas.single.cantidad, 10);
+    expect(compra.total, 220);
   });
 
   test('restaurar reemplaza, no mezcla', () async {

@@ -36,6 +36,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
   final _nombre = TextEditingController();
   final _stock = TextEditingController(text: '0');
   final _precio = TextEditingController();
+  final _costo = TextEditingController();
   final _codigo = TextEditingController();
 
   List<Repuesto> _inventario = const [];
@@ -52,6 +53,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
       _nombre.text = r.nombre;
       _stock.text = '${r.stock}';
       _precio.text = r.precio > 0 ? r.precio.toStringAsFixed(2) : '';
+      _costo.text = r.precioCosto > 0 ? r.precioCosto.toStringAsFixed(2) : '';
       _codigo.text = r.codigoBarras ?? '';
     }
 
@@ -63,6 +65,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
     _nombre.dispose();
     _stock.dispose();
     _precio.dispose();
+    _costo.dispose();
     _codigo.dispose();
     super.dispose();
   }
@@ -71,6 +74,15 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
     final items = await ref.read(inventarioRepoProvider).listar();
     if (mounted) setState(() => _inventario = items);
   }
+
+  /// Lo escrito ahora mismo, para calcular la ganancia mientras se teclea.
+  /// Se arma un [Repuesto] en vez de repetir la cuenta acá: la regla de qué
+  /// se gana vive en un solo lado.
+  Repuesto get _borrador => Repuesto(
+        nombre: _nombre.text,
+        precio: leerNumero(_precio.text),
+        precioCosto: leerNumero(_costo.text),
+      );
 
   /// Los que se parecen a lo que se está escribiendo, sin contar el propio.
   List<Repuesto> get _similares {
@@ -150,6 +162,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
       nombre: _nombre.text.trim(),
       stock: int.tryParse(_stock.text.trim()) ?? 0,
       precio: leerNumero(_precio.text),
+      precioCosto: leerNumero(_costo.text),
       codigoBarras: codigo.isEmpty ? null : codigo,
     );
 
@@ -217,32 +230,41 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
                     ),
                   ),
                   const SizedBox(height: Espacio.lg),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Campo(
-                          etiqueta: 'Stock',
-                          controlador: _stock,
-                          ejemplo: '0',
-                          teclado: TextInputType.number,
-                          formateadores: [soloDigitosFormato],
-                          validador: Valida.entero(),
-                        ),
-                      ),
-                      const SizedBox(width: Espacio.md),
-                      Expanded(
-                        child: Campo(
-                          etiqueta: 'Precio',
-                          controlador: _precio,
-                          ejemplo: '0.00',
-                          teclado: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          formateadores: [decimalFormato],
-                          validador: Valida.precio(obligatorio: true),
-                        ),
-                      ),
-                    ],
+                  Campo(
+                    etiqueta: 'Precio de compra',
+                    controlador: _costo,
+                    ejemplo: '0.00',
+                    opcional: true,
+                    ayuda: 'Lo que te cuesta a ti. Es lo que permite saber '
+                        'cuánto ganas; no sale impreso en ningún documento.',
+                    teclado:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    formateadores: [decimalFormato],
+                    textoAccion: TextInputAction.next,
+                    validador: Valida.precio(),
+                    onCambio: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Precio de venta',
+                    controlador: _precio,
+                    ejemplo: '0.00',
+                    teclado:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    formateadores: [decimalFormato],
+                    textoAccion: TextInputAction.next,
+                    validador: Valida.precio(obligatorio: true),
+                    onCambio: (_) => setState(() {}),
+                  ),
+                  _Ganancia(repuesto: _borrador),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Stock',
+                    controlador: _stock,
+                    ejemplo: '0',
+                    teclado: TextInputType.number,
+                    formateadores: [soloDigitosFormato],
+                    validador: Valida.entero(),
                   ),
                   const SizedBox(height: Espacio.lg),
                   Campo(
@@ -305,7 +327,7 @@ class _AvisoDuplicado extends StatelessWidget {
             const SizedBox(height: Espacio.sm),
             Text(
               'Crear otro igual deja uno agotado para siempre y otro con '
-              'stock. Mejor sumale las unidades que entraron.',
+              'stock. Mejor súmale las unidades que entraron.',
               style: Tipo.secundario,
             ),
             const SizedBox(height: Espacio.md),
@@ -318,6 +340,40 @@ class _AvisoDuplicado extends StatelessWidget {
       );
 }
 
+/// La ganancia por unidad, calculada mientras se escribe.
+///
+/// Aparece recién con los dos precios puestos: con uno solo la cuenta diría
+/// "pierdes todo", que es ruido mientras se está tecleando.
+class _Ganancia extends StatelessWidget {
+  const _Ganancia({required this.repuesto});
+
+  final Repuesto repuesto;
+
+  @override
+  Widget build(BuildContext context) {
+    final gana = repuesto.utilidad;
+    if (gana == null || repuesto.precio <= 0) return const SizedBox.shrink();
+
+    final margen = repuesto.margen;
+    final pierde = gana < 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: Espacio.sm),
+      child: Text(
+        pierde
+            ? 'Lo estás vendiendo por debajo de lo que te cuesta: pierdes '
+                '${soles(-gana)} por unidad.'
+            : 'Ganas ${soles(gana)} por unidad'
+                '${margen == null ? '' : ' (${margen.round()} %)'}.',
+        style: Tipo.nota.copyWith(
+          color: pierde ? Tono.vino : Tono.oroTexto,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
 class _Similares extends StatelessWidget {
   const _Similares({required this.items});
 
@@ -327,7 +383,7 @@ class _Similares extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('YA TENÉS ALGO PARECIDO', style: Tipo.etiqueta),
+          Text('YA TIENES ALGO PARECIDO', style: Tipo.etiqueta),
           const SizedBox(height: Espacio.sm),
           for (final r in items)
             Padding(

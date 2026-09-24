@@ -65,6 +65,24 @@ ahí se decide qué implementación concreta cumple cada contrato. Y
 - **La mano de obra no lleva cantidad**: un trabajo se cobra por lo acordado.
 - **El stock se mueve al agregar y al quitar cada línea**, no al guardar el
   registro; salir sin guardar restaura el inventario al estado que tenía.
+- **El stock sube por dos puertas distintas, y es a propósito.** "Registrar
+  compra" deja rastro —proveedor, boleta, fecha y a cuánto—; "Ajustar stock"
+  corrige un conteo y no pregunta nada. Meterlas en el mismo formulario
+  obligaría a inventar un proveedor para arreglar un número.
+- **El costo se congela en la línea, no se lee del inventario.** Si mañana
+  sube el precio de compra, lo que se ganó ayer no se mueve.
+- **Cero en el precio de compra significa "no se sabe", no "es gratis".** La
+  ganancia entonces se muestra como un techo y dice cuántos repuestos no
+  tienen costo cargado, en vez de suponer que salieron gratis e inflarla.
+- **La ganancia no sale impresa.** Ni en la boleta ni en el reporte de
+  servicio: es un número interno, el cliente no tiene por qué verlo.
+- **Lo vendido se cuenta leyendo los trabajos**, que son la fuente, y no una
+  tabla de movimientos aparte. Un registro paralelo habría que corregirlo a
+  mano cada vez que un trabajo se edita o se borra.
+- **Los datos de pago van impresos en la boleta**, además de viajar en el
+  mensaje al compartirla: **WhatsApp descarta el texto cuando lo adjuntado es
+  un PDF**, así que el papel es el único camino que no depende de por dónde se
+  mande. Al compartir también quedan en el portapapeles, para pegarlos.
 - **Las fechas son ISO corto sin hora ni zona horaria.** Hoy todavía no está
   vencido.
 - **La sesión dura el día.** Se guarda la fecha en que se entró y al cambiar el

@@ -117,7 +117,7 @@ class _SelectorRepuestoState extends ConsumerState<SelectorRepuesto> {
               : '${item.stock} en stock · ${soles(item.precio)}',
       contenido: (hoja) => _FormularioDetalle(
         precioSugerido: item?.precio ?? 0,
-        exigePrecio: item == null,
+        externo: item == null,
         onListo: (detalle) => Navigator.of(hoja).pop(detalle),
       ),
     );
@@ -129,6 +129,7 @@ class _SelectorRepuestoState extends ConsumerState<SelectorRepuesto> {
       desc: item?.nombre ?? (nombreLibre ?? '').trim(),
       cant: datos.cantidad,
       precio: datos.precio,
+      costo: datos.costo,
     );
 
     widget.onAgregar(resultado.lineas, resultado.aviso);
@@ -347,24 +348,30 @@ class _FilaRepuesto extends StatelessWidget {
 
 /// Cantidad y precio de una línea, para el caso que se sale de lo normal.
 class _DetalleLinea {
-  const _DetalleLinea(this.cantidad, this.precio);
+  const _DetalleLinea(this.cantidad, this.precio, this.costo);
 
   final int cantidad;
   final double precio;
+
+  /// Lo que costó conseguirlo. Solo se pregunta en los externos: los del
+  /// inventario ya lo saben.
+  final double? costo;
 }
 
 class _FormularioDetalle extends StatefulWidget {
   const _FormularioDetalle({
     required this.precioSugerido,
-    required this.exigePrecio,
+    required this.externo,
     required this.onListo,
   });
 
   final double precioSugerido;
 
-  /// Un repuesto externo no tiene precio en ningún lado: si no se pone acá,
-  /// la línea entra en cero y el total sale mal sin que nadie lo note.
-  final bool exigePrecio;
+  /// Un repuesto externo no tiene precio ni costo en ningún lado: el precio
+  /// se exige —si no, la línea entra en cero y el total sale mal sin que
+  /// nadie lo note— y el costo se pide, opcional, porque es la única
+  /// oportunidad de saber cuánto se ganó con él.
+  final bool externo;
 
   final ValueChanged<_DetalleLinea> onListo;
 
@@ -380,17 +387,25 @@ class _FormularioDetalleState extends State<_FormularioDetalle> {
         ? widget.precioSugerido.toStringAsFixed(2)
         : '',
   );
+  final _costo = TextEditingController();
   int _cantidad = 1;
 
   @override
   void dispose() {
     _precio.dispose();
+    _costo.dispose();
     super.dispose();
   }
 
   void _confirmar() {
     if (!_form.currentState!.validate()) return;
-    widget.onListo(_DetalleLinea(_cantidad, leerNumero(_precio.text)));
+
+    final costo = leerNumero(_costo.text);
+    widget.onListo(_DetalleLinea(
+      _cantidad,
+      leerNumero(_precio.text),
+      costo > 0 ? costo : null,
+    ));
   }
 
   @override
@@ -436,8 +451,23 @@ class _FormularioDetalleState extends State<_FormularioDetalle> {
                 ejemplo: '0.00',
                 teclado: const TextInputType.numberWithOptions(decimal: true),
                 formateadores: [decimalFormato],
-                validador: Valida.precio(obligatorio: widget.exigePrecio),
+                validador: Valida.precio(obligatorio: widget.externo),
               ),
+              if (widget.externo) ...[
+                const SizedBox(height: Espacio.lg),
+                Campo(
+                  etiqueta: 'Precio de compra',
+                  controlador: _costo,
+                  ejemplo: '0.00',
+                  opcional: true,
+                  ayuda: 'Lo que te costó a ti. Sin esto, la ganancia del '
+                      'trabajo queda incompleta.',
+                  teclado:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  formateadores: [decimalFormato],
+                  validador: Valida.precio(),
+                ),
+              ],
               const SizedBox(height: Espacio.xl),
               FilledButton(onPressed: _confirmar, child: const Text('Agregar')),
             ],

@@ -13,6 +13,8 @@ import '../../../core/widgets/escaner_codigo.dart';
 import '../../../domain/entities/repuesto.dart';
 import '../../comunes/filtro_chips.dart';
 import 'formulario_repuesto.dart';
+import 'hoja_repuesto.dart';
+import 'pantalla_compra.dart';
 
 enum _FiltroStock { todos, conStock, agotados }
 
@@ -75,6 +77,31 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
     }
   }
 
+  /// Tocar una fila abre su ficha, y de ahí sale todo lo demás. La lista
+  /// quedó para **consultar**: buscar y ver stock.
+  Future<void> _abrirFicha(Repuesto r) async {
+    final accion = await mostrarFichaRepuesto(context, r);
+    if (accion == null || !mounted) return;
+
+    switch (accion) {
+      case AccionRepuesto.editar:
+        await _abrirFormulario(r);
+
+      case AccionRepuesto.ajustar:
+        final hecho = await mostrarAjusteStock(context, ref, r);
+        if (hecho && mounted) await _cargar();
+
+      case AccionRepuesto.comprar:
+        final hecho = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => PantallaCompra(inicial: r)),
+        );
+        if (hecho == true && mounted) await _cargar();
+
+      case AccionRepuesto.eliminar:
+        await _eliminar(r);
+    }
+  }
+
   Future<void> _buscarPorCodigo() async {
     final codigo = await escanearCodigo(context, titulo: 'Buscar por código');
     if (codigo == null || !mounted) return;
@@ -86,7 +113,7 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
       mostrarAviso(context, 'Ningún repuesto tiene el código $codigo.');
       return;
     }
-    await _abrirFormulario(item);
+    await _abrirFicha(item);
   }
 
   Future<void> _eliminar(Repuesto r) async {
@@ -244,11 +271,7 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
                 child: ListaAgrupada(
                   filas: [
                     for (final r in visibles)
-                      _FilaRepuesto(
-                        repuesto: r,
-                        onTap: () => _abrirFormulario(r),
-                        onEliminar: () => _eliminar(r),
-                      ),
+                      _FilaRepuesto(repuesto: r, onTap: () => _abrirFicha(r)),
                   ],
                 ),
               ),
@@ -276,15 +299,10 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
 }
 
 class _FilaRepuesto extends StatelessWidget {
-  const _FilaRepuesto({
-    required this.repuesto,
-    required this.onTap,
-    required this.onEliminar,
-  });
+  const _FilaRepuesto({required this.repuesto, required this.onTap});
 
   final Repuesto repuesto;
   final VoidCallback onTap;
-  final VoidCallback onEliminar;
 
   @override
   Widget build(BuildContext context) {
@@ -324,14 +342,8 @@ class _FilaRepuesto extends StatelessWidget {
             ),
           ),
           Text(soles(r.precio), style: Tipo.monto),
-          IconButton(
-            onPressed: onEliminar,
-            iconSize: 19,
-            visualDensity: VisualDensity.compact,
-            color: Tono.texto3,
-            tooltip: 'Eliminar',
-            icon: const Icon(Icons.delete_outline_rounded),
-          ),
+          const SizedBox(width: Espacio.sm),
+          const Icon(Icons.chevron_right_rounded, size: 20, color: Tono.texto3),
         ],
       ),
     );

@@ -15,10 +15,12 @@ import 'package:taller_repuestos/core/utils/clave_segura.dart';
 import 'package:taller_repuestos/core/theme/app_theme.dart';
 import 'package:taller_repuestos/core/theme/tokens.dart';
 import 'package:taller_repuestos/data/local/app_database.dart';
+import 'package:taller_repuestos/data/repositories/compras_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/inventario_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/negocio_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/recordatorios_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/trabajos_repository_sqlite.dart';
+import 'package:taller_repuestos/domain/entities/compra.dart';
 import 'package:taller_repuestos/domain/entities/linea.dart';
 import 'package:taller_repuestos/domain/entities/negocio.dart';
 import 'package:taller_repuestos/domain/entities/recordatorio.dart';
@@ -27,6 +29,9 @@ import 'package:taller_repuestos/domain/entities/repuesto.dart';
 import 'package:taller_repuestos/domain/entities/trabajo.dart';
 import 'package:taller_repuestos/presentation/features/apertura/pantalla_apertura.dart';
 import 'package:taller_repuestos/presentation/features/auth/pantalla_login.dart';
+import 'package:taller_repuestos/presentation/features/inventario/formulario_repuesto.dart';
+import 'package:taller_repuestos/presentation/features/inventario/pantalla_compra.dart';
+import 'package:taller_repuestos/presentation/features/reportes/pantalla_reportes.dart';
 import 'package:taller_repuestos/presentation/features/negocio/pantalla_negocio.dart';
 import 'package:taller_repuestos/presentation/features/negocio/pantalla_respaldo.dart';
 import 'package:taller_repuestos/presentation/features/shell/shell_principal.dart';
@@ -269,6 +274,64 @@ void main() {
     );
   });
 
+  testWidgets('formulario de repuesto: los dos precios y lo que deja',
+      (tester) async {
+    final item = await tester.runAsync(
+      () => InventarioRepositorySqlite(base_).porNombreExacto('Filtro de aceite'),
+    );
+    expect(item, isNotNull);
+
+    await _mostrar(tester, FormularioRepuesto(repuesto: item));
+    expect(find.textContaining('Ganas'), findsOneWidget);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/18-repuesto.png'),
+    );
+  });
+
+  testWidgets('ficha de un repuesto', (tester) async {
+    await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
+    await tester.tap(find.byIcon(Icons.inventory_2_rounded).first);
+    await _asentar(tester);
+    await tester.tap(find.text('Filtro de aceite'));
+    await _esperarA(tester, find.text('Vendidos'));
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.text('ÚLTIMAS COMPRAS'), findsOneWidget);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/19-ficha-repuesto.png'),
+    );
+  });
+
+  testWidgets('registrar una compra', (tester) async {
+    await _mostrar(tester, const PantallaCompra());
+    await tester.tap(find.text('Agregar repuesto'));
+    await _asentar(tester);
+    await _esperarA(tester, find.text('Rodamiento 6205'));
+    await tester.tap(find.text('Rodamiento 6205'));
+    await _asentar(tester);
+    await tester.tap(find.text('Agregar a la compra'));
+    await _asentar(tester);
+    expect(find.text('TOTAL'), findsOneWidget);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/20-compra.png'),
+    );
+  });
+
+  testWidgets('reportes', (tester) async {
+    await _mostrar(tester, const PantallaReportes());
+    await _esperarA(tester, find.text('LO QUE MÁS SALE'));
+    // "Todo" y no "Este mes": una captura que se vacía al cambiar de mes no
+    // sirve para comparar nada.
+    await tester.tap(find.text('Todo'));
+    await _asentar(tester);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/21-reportes.png'),
+    );
+  });
+
   testWidgets('inventario', (tester) async {
     await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
     await tester.tap(find.byIcon(Icons.inventory_2_rounded).first);
@@ -414,17 +477,23 @@ Future<void> _sembrar(AppDatabase db) async {
     direccion: 'Av. Industrial 455, Lima',
     telefono: '999888777',
     email: 'taller@correo.com',
+    banco: 'BCP',
+    cuenta: '191-0123456-0-12',
+    cci: '00219100123456012',
+    yape: '999888777',
   ));
 
   await inventario.crear(const Repuesto(
     nombre: 'Filtro de aceite',
     stock: 12,
     precio: 38.5,
+    precioCosto: 22.35,
   ));
   await inventario.crear(const Repuesto(
     nombre: 'Rodamiento 6205',
     stock: 3,
     precio: 22,
+    precioCosto: 13,
   ));
   await inventario.crear(const Repuesto(nombre: 'Faja A-52', precio: 45));
 
@@ -443,7 +512,11 @@ Future<void> _sembrar(AppDatabase db) async {
       diagnostico: 'Revisión general',
       trabajosRealizados: [LineaMano(desc: 'Mantenimiento', precio: mano)],
       repuestos: const [
-        LineaRepuesto(desc: 'Filtro de aceite', cantidad: 1, precio: 38.5),
+        LineaRepuesto(
+            desc: 'Filtro de aceite',
+            cantidad: 1,
+            precio: 38.5,
+            costo: 22.35),
       ],
     ));
     if (cerrado) {
@@ -512,6 +585,21 @@ Future<void> _sembrar(AppDatabase db) async {
     repite: Repeticion(15, UnidadRepeticion.dias),
     cliente: 'Luis Paredes',
   ));
+  final filtro = await inventario.porNombreExacto('Filtro de aceite');
+  await ComprasRepositorySqlite(db).registrar(Compra(
+    fecha: '2026-09-04',
+    proveedor: 'Repuestos Lima',
+    boleta: 'B001-2214',
+    lineas: [
+      LineaCompra(
+        desc: 'Filtro de aceite',
+        cantidad: 12,
+        costo: 22.35,
+        inventarioId: filtro?.id,
+      ),
+    ],
+  ));
+
   await recordatorios.refrescarVencidos();
 }
 

@@ -1,7 +1,7 @@
 name: taller_repuestos
 description: "MS â€” registro de trabajos, repuestos y documentos para taller."
 publish_to: 'none'
-version: 1.1.0+2
+version: 1.4.0+5
 
 environment:
   sdk: ^3.13.2
