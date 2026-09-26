@@ -7,7 +7,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../domain/repositories/auth_repository.dart';
 
 /// Qué se eligió en el menú del negocio.
-enum AccionNegocio { datos, compras, reportes, respaldo, correo, clave, salir }
+enum AccionNegocio { datos, reportes, respaldo, correo, clave, salir }
 
 /// La barra de arriba.
 ///
@@ -129,8 +129,6 @@ class _MenuNegocio extends StatelessWidget {
         itemBuilder: (context) => [
           _item(AccionNegocio.datos, Icons.storefront_rounded,
               'Datos del negocio', 'Lo que sale impreso en el documento'),
-          _item(AccionNegocio.compras, Icons.local_shipping_rounded, 'Compras',
-              'Lo que te llegó y de quién'),
           _item(AccionNegocio.reportes, Icons.insights_rounded, 'Reportes',
               'Ganancia y lo que más sale'),
           _item(AccionNegocio.respaldo, Icons.save_alt_rounded, 'Respaldo',

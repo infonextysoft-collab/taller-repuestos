@@ -6,9 +6,7 @@ import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/dinero.dart';
 import '../../../core/utils/fechas.dart';
-import '../../../core/utils/texto.dart';
 import '../../../core/widgets/contenido.dart';
-import '../../../domain/entities/compra.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../../domain/services/estadisticas.dart';
 import '../../../domain/services/ganancia.dart';
@@ -32,7 +30,6 @@ class PantallaReportes extends ConsumerStatefulWidget {
 class _PantallaReportesState extends ConsumerState<PantallaReportes> {
   _Periodo _periodo = _Periodo.mes;
   List<Trabajo> _trabajos = const [];
-  List<Compra> _compras = const [];
   bool _cargando = true;
 
   @override
@@ -43,12 +40,10 @@ class _PantallaReportesState extends ConsumerState<PantallaReportes> {
 
   Future<void> _cargar() async {
     final trabajos = await ref.read(trabajosRepoProvider).listar();
-    final compras = await ref.read(comprasRepoProvider).listar();
 
     if (mounted) {
       setState(() {
         _trabajos = trabajos;
-        _compras = compras;
         _cargando = false;
       });
     }
@@ -64,13 +59,9 @@ class _PantallaReportesState extends ConsumerState<PantallaReportes> {
   List<Trabajo> get _cerrados =>
       _trabajos.where((t) => t.estaTerminado && _entra(t.fecha)).toList();
 
-  List<Compra> get _comprasDelPeriodo =>
-      _compras.where((c) => _entra(c.fecha)).toList();
-
   @override
   Widget build(BuildContext context) {
     final cerrados = _cerrados;
-    final compras = _comprasDelPeriodo;
 
     var cobrado = 0.0;
     var costo = 0.0;
@@ -118,10 +109,6 @@ class _PantallaReportesState extends ConsumerState<PantallaReportes> {
                   cobrado: redondear(cobrado),
                   costo: redondear(costo),
                   sinCosto: sinCosto,
-                  comprado: redondear(
-                    compras.fold<double>(0, (s, c) => s + c.total),
-                  ),
-                  compras: compras.length,
                 ),
               ),
               const SizedBox(height: Espacio.xl),
@@ -149,11 +136,6 @@ class _PantallaReportesState extends ConsumerState<PantallaReportes> {
                   ],
                 ),
               ),
-              const SizedBox(height: Espacio.xl),
-              Contenido(
-                ancho: Ancho.acciones,
-                child: _PorProveedor(compras: compras),
-              ),
             ],
           ],
         ),
@@ -169,16 +151,12 @@ class _Plata extends StatelessWidget {
     required this.cobrado,
     required this.costo,
     required this.sinCosto,
-    required this.comprado,
-    required this.compras,
   });
 
   final int trabajos;
   final double cobrado;
   final double costo;
   final int sinCosto;
-  final double comprado;
-  final int compras;
 
   @override
   Widget build(BuildContext context) {
@@ -216,18 +194,6 @@ class _Plata extends StatelessWidget {
             soles(cobrado),
           ),
           _Dato('Costo de los repuestos usados', soles(costo)),
-          const SizedBox(height: Espacio.sm),
-          _Dato(
-            compras == 1 ? 'Comprado en 1 compra' : 'Comprado en $compras compras',
-            soles(comprado),
-            apagado: true,
-          ),
-          const SizedBox(height: Espacio.sm),
-          Text(
-            'Lo comprado no se resta de la ganancia: lo que entra al stock se '
-            'descuenta recién cuando se vende.',
-            style: Tipo.nota,
-          ),
         ],
       ),
     );
@@ -235,11 +201,10 @@ class _Plata extends StatelessWidget {
 }
 
 class _Dato extends StatelessWidget {
-  const _Dato(this.etiqueta, this.valor, {this.apagado = false});
+  const _Dato(this.etiqueta, this.valor);
 
   final String etiqueta;
   final String valor;
-  final bool apagado;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -248,12 +213,7 @@ class _Dato extends StatelessWidget {
           children: [
             Expanded(child: Text(etiqueta, style: Tipo.secundario)),
             const SizedBox(width: Espacio.md),
-            Text(
-              valor,
-              style: Tipo.monto.copyWith(
-                color: apagado ? Tono.texto3 : Tono.texto,
-              ),
-            ),
+            Text(valor, style: Tipo.monto),
           ],
         ),
       );
@@ -304,69 +264,6 @@ class _FilaVendido extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// A quién se le compró más en el período.
-class _PorProveedor extends StatelessWidget {
-  const _PorProveedor({required this.compras});
-
-  final List<Compra> compras;
-
-  @override
-  Widget build(BuildContext context) {
-    // Se agrupa ignorando tildes y mayúsculas, igual que al sugerirlos.
-    final total = <String, double>{};
-    final nombres = <String, String>{};
-
-    for (final c in compras) {
-      final quien = c.proveedor.trim();
-      final clave = quien.isEmpty ? '' : normalizar(quien);
-      total[clave] = (total[clave] ?? 0) + c.total;
-      nombres.putIfAbsent(clave, () => quien.isEmpty ? 'Sin proveedor' : quien);
-    }
-
-    final claves = total.keys.toList()
-      ..sort((a, b) => total[b]!.compareTo(total[a]!));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('A QUIÉN LE COMPRAS', style: Tipo.etiqueta),
-        const SizedBox(height: Espacio.md),
-        if (claves.isEmpty)
-          Panel(
-            color: Tono.fondo2,
-            child: Text(
-              'No hay compras registradas en este período.',
-              style: Tipo.secundario,
-            ),
-          )
-        else
-          ListaAgrupada(
-            filas: [
-              for (final clave in claves.take(5))
-                FilaLista(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          nombres[clave]!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: clave.isEmpty
-                              ? Tipo.encabezado.copyWith(color: Tono.texto3)
-                              : Tipo.encabezado,
-                        ),
-                      ),
-                      Text(soles(redondear(total[clave]!)), style: Tipo.monto),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-      ],
     );
   }
 }

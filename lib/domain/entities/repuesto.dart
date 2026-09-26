@@ -8,6 +8,7 @@ class Repuesto {
     this.stock = 0,
     this.precio = 0,
     this.precioCosto = 0,
+    this.proveedor = '',
     this.codigoBarras,
   });
 
@@ -22,6 +23,10 @@ class Repuesto {
   /// lo que traen todos los repuestos cargados antes de que existiera este
   /// campo, y por eso la ganancia se calla en vez de inventar un número.
   final double precioCosto;
+
+  /// A quién se le compra. Es una nota para uno mismo —dónde reponerlo—, no
+  /// un catálogo: se escribe suelto, igual que el cliente de un trabajo.
+  final String proveedor;
 
   /// Un código vacío se guarda como **NULL**, nunca como cadena vacía: si no,
   /// el índice junta todos los repuestos sin código y la búsqueda por código
@@ -47,6 +52,7 @@ class Repuesto {
     int? stock,
     double? precio,
     double? precioCosto,
+    String? proveedor,
     String? codigoBarras,
     bool quitarCodigo = false,
   }) =>
@@ -56,6 +62,7 @@ class Repuesto {
         stock: stock ?? this.stock,
         precio: precio ?? this.precio,
         precioCosto: precioCosto ?? this.precioCosto,
+        proveedor: proveedor ?? this.proveedor,
         codigoBarras:
             quitarCodigo ? null : (codigoBarras ?? this.codigoBarras),
       );
@@ -66,6 +73,7 @@ class Repuesto {
         'stock': stock,
         'precio': precio,
         'precioCosto': precioCosto,
+        'proveedor': proveedor.trim(),
         'codigoBarras': normalizarCodigo(codigoBarras),
       };
 
@@ -75,6 +83,7 @@ class Repuesto {
         stock: (r['stock'] as num?)?.toInt() ?? 0,
         precio: (r['precio'] as num?)?.toDouble() ?? 0,
         precioCosto: (r['precioCosto'] as num?)?.toDouble() ?? 0,
+        proveedor: (r['proveedor'] ?? '').toString(),
         codigoBarras: normalizarCodigo(r['codigoBarras']?.toString()),
       );
 }

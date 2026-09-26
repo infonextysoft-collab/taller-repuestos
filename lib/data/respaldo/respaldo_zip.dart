@@ -34,17 +34,15 @@ class RespaldoZip implements RespaldoRepository {
     'inventario',
     'trabajos',
     'recordatorios',
-    'compras',
   ];
 
   static const String _archivoDatos = 'datos.json';
   static const String _carpetaFotos = 'fotos';
 
   /// Sube cuando cambia la forma del respaldo, no el esquema de la base.
-  /// 1 → 2: el respaldo también se lleva las compras.
-  ///
-  /// Se sube el número para que una app vieja **avise** en vez de restaurar
-  /// un archivo nuevo dejando las compras en el camino sin decir nada.
+  /// La 2 sumó las compras, que después se sacaron de la app. El número no
+  /// vuelve atrás: un respaldo hecho con la 2 se restaura igual, y su clave
+  /// `compras` simplemente ya no le interesa a nadie.
   static const int _formato = 2;
 
   /* ------------------------------------------------------------- exportar */

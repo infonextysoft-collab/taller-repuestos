@@ -25,7 +25,12 @@ void main() {
     estado: EstadoTrabajo.terminado,
     fecha: '2026-09-13',
     cliente: 'Juan Ramírez',
-    equipo: 'Compresor Atlas',
+    equipo: 'MG',
+    modelo: 'MG 5',
+    placa: 'T7D164',
+    anio: '2023',
+    nMotor: '15S4C9KGN6280408',
+    vin: 'LSJA36E31PZ042103',
     diagnostico: 'Cables rotos',
     trabajosRealizados: const [
       LineaMano(desc: 'Rebobinado del motor', precio: 300),

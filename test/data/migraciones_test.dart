@@ -7,12 +7,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:taller_repuestos/core/utils/clave_segura.dart';
 import 'package:taller_repuestos/core/utils/imagenes.dart';
 import 'package:taller_repuestos/data/local/app_database.dart';
-import 'package:taller_repuestos/data/repositories/compras_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/inventario_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/negocio_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/recordatorios_repository_sqlite.dart';
 import 'package:taller_repuestos/data/repositories/trabajos_repository_sqlite.dart';
-import 'package:taller_repuestos/domain/entities/compra.dart';
 import 'package:taller_repuestos/domain/entities/repeticion.dart';
 
 /// Abrir una base que ya existe.
@@ -291,37 +289,38 @@ void main() {
         reason: 'lo cargado antes de este campo no sabe cuánto costó');
   });
 
-  test('una base vieja estrena la tabla de compras, vacía y usable', () async {
+  test('un trabajo viejo estrena placa, año, motor y VIN vacíos', () async {
     final ruta = await baseVieja(_esquemaWeb, (d) async {
-      await d.insert('inventario', {'nombre': 'BUJIA', 'stock': 2, 'precio': 30.0});
+      await d.insert('trabajos', {
+        'codigo': 'REP-2026-0001',
+        'tipo': 'taller',
+        'estado': 'terminado',
+        'fecha': '2026-09-09',
+        'cliente': 'Juan Ramírez',
+        'equipo': 'Compresor Atlas',
+      });
       await d.insert('auth', {'id': 1, 'usuario': 'Samuel', 'clave': 'Clave99'});
     });
 
     final base = await AppDatabase.abrirEn(databaseFactoryFfi, ruta);
     addTearDown(base.cerrar);
 
-    final compras = ComprasRepositorySqlite(base);
-    expect(await compras.listar(), isEmpty);
+    final trabajos =
+        TrabajosRepositorySqlite(base, InventarioRepositorySqlite(base));
+    final viejo = (await trabajos.listar()).single;
 
-    final inventario = InventarioRepositorySqlite(base);
-    final id = (await inventario.listar()).single.id!;
-    await compras.registrar(Compra(
-      fecha: '2026-09-20',
-      proveedor: 'Don Pepe',
-      lineas: [
-        LineaCompra(desc: 'BUJIA', cantidad: 5, costo: 18, inventarioId: id),
-      ],
-    ));
-
-    expect((await inventario.obtener(id))!.stock, 7);
-    expect((await compras.listar()).single.proveedor, 'Don Pepe');
+    expect(viejo.equipo, 'Compresor Atlas');
+    expect(viejo.placa, '');
+    expect(viejo.anio, '');
+    expect(viejo.nMotor, '');
+    expect(viejo.vin, '');
   });
 }
 
 /// El esquema tal como lo creaba la app publicada en la vista web (commit
 /// 738c046): ya con las columnas de la v2, sin tabla de fotos y con la
-/// contraseña en texto plano. Copiado a mano a propósito — si alguien cambia el
-/// esquema actual, esta foto del pasado no se tiene que mover con él.
+/// contraseña en texto plano. Copiado a mano a propósito — si alguien cambia
+/// el esquema actual, esta foto del pasado no se tiene que mover con él.
 const List<String> _esquemaWeb = [
   '''
     CREATE TABLE trabajos (

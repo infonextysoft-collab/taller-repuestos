@@ -63,6 +63,10 @@ class Trabajo {
     this.facturarA = '',
     this.equipo = '',
     this.modelo = '',
+    this.placa = '',
+    this.anio = '',
+    this.nMotor = '',
+    this.vin = '',
     this.ubicacion = '',
     this.movilidad = Movilidad.cliente,
     this.vueltas = 0,
@@ -95,6 +99,17 @@ class Trabajo {
   final String facturarA;
   final String equipo;
   final String modelo;
+
+  /// La patente del vehículo. Es el único de los cuatro que se pide: es con
+  /// lo que el cliente y el taller nombran el trabajo.
+  final String placa;
+
+  /// Los tres de abajo salen impresos solo si se cargaron. Un motor eléctrico
+  /// o un compresor no tienen ninguno, y un documento con tres renglones
+  /// vacíos se lee peor que uno sin ellos.
+  final String anio;
+  final String nMotor;
+  final String vin;
   final String ubicacion;
 
   final Movilidad movilidad;
@@ -154,6 +169,10 @@ class Trabajo {
     String? facturarA,
     String? equipo,
     String? modelo,
+    String? placa,
+    String? anio,
+    String? nMotor,
+    String? vin,
     String? ubicacion,
     Movilidad? movilidad,
     int? vueltas,
@@ -184,6 +203,10 @@ class Trabajo {
         facturarA: facturarA ?? this.facturarA,
         equipo: equipo ?? this.equipo,
         modelo: modelo ?? this.modelo,
+        placa: placa ?? this.placa,
+        anio: anio ?? this.anio,
+        nMotor: nMotor ?? this.nMotor,
+        vin: vin ?? this.vin,
         ubicacion: ubicacion ?? this.ubicacion,
         movilidad: movilidad ?? this.movilidad,
         vueltas: vueltas ?? this.vueltas,
@@ -221,6 +244,10 @@ class Trabajo {
         'facturarA': facturarA,
         'equipo': equipo,
         'modelo': modelo,
+        'placa': placa,
+        'anio': anio,
+        'nMotor': nMotor,
+        'vin': vin,
         'ubicacion': ubicacion,
         'movilidad': movilidad.name,
         'vueltas': vueltas,
@@ -266,6 +293,10 @@ class Trabajo {
         facturarA: (r['facturarA'] ?? '').toString(),
         equipo: (r['equipo'] ?? '').toString(),
         modelo: (r['modelo'] ?? '').toString(),
+        placa: (r['placa'] ?? '').toString(),
+        anio: (r['anio'] ?? '').toString(),
+        nMotor: (r['nMotor'] ?? '').toString(),
+        vin: (r['vin'] ?? '').toString(),
         ubicacion: (r['ubicacion'] ?? '').toString(),
         movilidad: _enumDe(Movilidad.values, r['movilidad'], Movilidad.cliente),
         vueltas: (r['vueltas'] as num?)?.toInt() ?? 0,

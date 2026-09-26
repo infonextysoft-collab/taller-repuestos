@@ -37,6 +37,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
   final _stock = TextEditingController(text: '0');
   final _precio = TextEditingController();
   final _costo = TextEditingController();
+  final _proveedor = TextEditingController();
   final _codigo = TextEditingController();
 
   List<Repuesto> _inventario = const [];
@@ -54,6 +55,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
       _stock.text = '${r.stock}';
       _precio.text = r.precio > 0 ? r.precio.toStringAsFixed(2) : '';
       _costo.text = r.precioCosto > 0 ? r.precioCosto.toStringAsFixed(2) : '';
+      _proveedor.text = r.proveedor;
       _codigo.text = r.codigoBarras ?? '';
     }
 
@@ -66,6 +68,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
     _stock.dispose();
     _precio.dispose();
     _costo.dispose();
+    _proveedor.dispose();
     _codigo.dispose();
     super.dispose();
   }
@@ -163,6 +166,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
       stock: int.tryParse(_stock.text.trim()) ?? 0,
       precio: leerNumero(_precio.text),
       precioCosto: leerNumero(_costo.text),
+      proveedor: _proveedor.text.trim(),
       codigoBarras: codigo.isEmpty ? null : codigo,
     );
 
@@ -265,6 +269,15 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
                     teclado: TextInputType.number,
                     formateadores: [soloDigitosFormato],
                     validador: Valida.entero(),
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Proveedor',
+                    controlador: _proveedor,
+                    ejemplo: 'A quién se lo compras',
+                    opcional: true,
+                    ayuda: 'Para acordarte dónde reponerlo.',
+                    textoAccion: TextInputAction.next,
                   ),
                   const SizedBox(height: Espacio.lg),
                   Campo(

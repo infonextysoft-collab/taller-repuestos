@@ -233,7 +233,9 @@ class GeneradorPdf {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _subtitulo(titulo),
+        // Con el título vacío no se dibuja encabezado: así un mismo bloque
+        // puede partirse en dos filas sin repetir el rótulo.
+        if (titulo.trim().isNotEmpty) _subtitulo(titulo),
         pw.Table(
           border: pw.TableBorder.all(color: _linea, width: 0.2),
           children: [
@@ -483,8 +485,18 @@ class GeneradorPdf {
     agregar(_tablaDatos('Datos del equipo', [
       ['Equipo', t.equipo],
       ['Modelo / N° serie', t.modelo],
-      ['Ubicación', t.ubicacion],
+      ['Año', t.anio],
     ]));
+
+    // Segunda fila del mismo bloque: tres datos largos no entran en la de
+    // arriba sin quedar cortados, y los que no se cargaron no salen.
+    agregar(_tablaDatos('', [
+      ['Placa', t.placa],
+      ['N° de motor', t.nMotor],
+      ['VIN', t.vin],
+    ]));
+
+    agregar(_tablaDatos('', [['Ubicación', t.ubicacion]]));
 
     if (t.observaciones.trim().isNotEmpty) {
       bloques.add(_subtitulo('Observaciones'));
@@ -549,6 +561,13 @@ class GeneradorPdf {
     agregar(_tablaDatos('Equipo', [
       ['Equipo', t.equipo],
       ['Modelo / N° serie', t.modelo],
+      ['Año', t.anio],
+    ]));
+
+    agregar(_tablaDatos('', [
+      ['Placa', t.placa],
+      ['N° de motor', t.nMotor],
+      ['VIN', t.vin],
     ]));
 
     if (boleta.incluyeManoDeObra && t.trabajosRealizados.isNotEmpty) {

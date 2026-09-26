@@ -32,6 +32,10 @@ class CamposWizard {
   final facturarA = TextEditingController();
   final equipo = TextEditingController();
   final modelo = TextEditingController();
+  final placa = TextEditingController();
+  final anio = TextEditingController();
+  final nMotor = TextEditingController();
+  final vin = TextEditingController();
   final ubicacion = TextEditingController();
   final vueltas = TextEditingController(text: '1');
   final precioVuelta = TextEditingController();
@@ -46,6 +50,10 @@ class CamposWizard {
     facturarA.text = t.facturarA;
     equipo.text = t.equipo;
     modelo.text = t.modelo;
+    placa.text = t.placa;
+    anio.text = t.anio;
+    nMotor.text = t.nMotor;
+    vin.text = t.vin;
     ubicacion.text = t.ubicacion;
     if (t.vueltas > 0) vueltas.text = '${t.vueltas}';
     if (t.precioVuelta > 0) {
@@ -64,6 +72,10 @@ class CamposWizard {
       facturarA,
       equipo,
       modelo,
+      placa,
+      anio,
+      nMotor,
+      vin,
       ubicacion,
       vueltas,
       precioVuelta,
@@ -273,10 +285,65 @@ class _ClienteEquipo extends StatelessWidget {
               Campo(
                 etiqueta: 'Modelo o N° de serie',
                 controlador: campos.modelo,
-                ejemplo: 'Lo que diga la placa',
+                ejemplo: 'Lo que diga la chapa',
                 opcional: true,
                 habilitado: !bloqueado,
+                textoAccion: TextInputAction.next,
                 onCambio: (v) => ctrl.editar((r) => r.copyWith(modelo: v)),
+              ),
+              const SizedBox(height: Espacio.lg),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Campo(
+                      etiqueta: 'Placa',
+                      controlador: campos.placa,
+                      ejemplo: 'T7D164',
+                      habilitado: !bloqueado,
+                      textoAccion: TextInputAction.next,
+                      validador: Valida.obligatorio('la placa'),
+                      onCambio: (v) =>
+                          ctrl.editar((r) => r.copyWith(placa: v)),
+                    ),
+                  ),
+                  const SizedBox(width: Espacio.md),
+                  Expanded(
+                    child: Campo(
+                      etiqueta: 'Año',
+                      controlador: campos.anio,
+                      ejemplo: '2023',
+                      opcional: true,
+                      teclado: TextInputType.number,
+                      habilitado: !bloqueado,
+                      textoAccion: TextInputAction.next,
+                      onCambio: (v) => ctrl.editar((r) => r.copyWith(anio: v)),
+                    ),
+                  ),
+                ],
+              ),
+              // Los dos de abajo son largos y van solos: partidos en dos
+              // columnas se leen a medias y se tipean peor.
+              const SizedBox(height: Espacio.lg),
+              Campo(
+                etiqueta: 'N° de motor',
+                controlador: campos.nMotor,
+                ejemplo: '15S4C9KGN6280408',
+                opcional: true,
+                habilitado: !bloqueado,
+                textoAccion: TextInputAction.next,
+                onCambio: (v) => ctrl.editar((r) => r.copyWith(nMotor: v)),
+              ),
+              const SizedBox(height: Espacio.lg),
+              Campo(
+                etiqueta: 'VIN',
+                controlador: campos.vin,
+                ejemplo: 'LSJA36E31PZ042103',
+                opcional: true,
+                ayuda: 'Los tres opcionales salen impresos solo si los '
+                    'cargas.',
+                habilitado: !bloqueado,
+                onCambio: (v) => ctrl.editar((r) => r.copyWith(vin: v)),
               ),
             ],
           ),

@@ -5,7 +5,6 @@ import '../data/documentos/generador_pdf.dart';
 import '../data/fotos/servicio_fotos.dart';
 import '../data/local/app_database.dart';
 import '../data/repositories/auth_repository_sqlite.dart';
-import '../data/repositories/compras_repository_sqlite.dart';
 import '../data/repositories/inventario_repository_sqlite.dart';
 import '../data/repositories/negocio_repository_sqlite.dart';
 import '../data/repositories/recordatorios_repository_sqlite.dart';
@@ -14,7 +13,6 @@ import '../data/respaldo/respaldo_zip.dart';
 import '../domain/entities/negocio.dart';
 import '../domain/entities/resumen_taller.dart';
 import '../domain/repositories/auth_repository.dart';
-import '../domain/repositories/compras_repository.dart';
 import '../domain/repositories/inventario_repository.dart';
 import '../domain/repositories/negocio_repository.dart';
 import '../domain/repositories/recordatorios_repository.dart';
@@ -36,9 +34,6 @@ final inventarioRepoProvider = Provider<InventarioRepository>(
   (ref) => InventarioRepositorySqlite(ref.watch(baseDatosProvider)),
 );
 
-final comprasRepoProvider = Provider<ComprasRepository>(
-  (ref) => ComprasRepositorySqlite(ref.watch(baseDatosProvider)),
-);
 
 final trabajosRepoProvider = Provider<TrabajosRepository>(
   (ref) => TrabajosRepositorySqlite(

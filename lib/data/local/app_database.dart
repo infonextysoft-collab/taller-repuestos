@@ -86,9 +86,16 @@ class AppDatabase {
   /// 5 → 6: el repuesto guarda a cuánto se compra, no solo a cuánto se vende.
   /// Sin eso no hay forma de saber cuánto se gana.
   ///
-  /// 6 → 7: aparecen las compras, que es de donde entra el stock y lo único
-  /// que sabe a quién y cuándo se le compró.
-  static const int _version = 7;
+  /// 6 → 7: aparecieron las compras como tabla propia. **Se dio marcha
+  /// atrás en la 8**: registrar cada compra con proveedor, boleta y renglones
+  /// era demasiado trámite para un taller, y lo único que se quería saber
+  /// —de quién se compra un repuesto— entra en el repuesto mismo. La tabla
+  /// se deja de crear y de usar; en las bases que ya la tienen queda vacía,
+  /// que es más barato que borrarla y no se lleva nada puesto.
+  ///
+  /// 7 → 8: el trabajo guarda placa, año, número de motor y VIN, y el
+  /// repuesto de quién se compra.
+  static const int _version = 8;
 
   @visibleForTesting
   static int get version => _version;
@@ -164,9 +171,15 @@ class AppDatabase {
           d, 'inventario', 'precioCosto', 'REAL NOT NULL DEFAULT 0');
     }
 
-    if (desde < 7 && !await _existeTabla(d, 'compras')) {
-      await d.execute(_tablaCompras);
-      await d.execute(_indiceCompras);
+    // La 7 creaba la tabla `compras`. Ya no: ver la historia de [_version].
+
+    if (desde < 8) {
+      const vacia = "TEXT NOT NULL DEFAULT ''";
+      await _agregarColumna(d, 'trabajos', 'placa', vacia);
+      await _agregarColumna(d, 'trabajos', 'anio', vacia);
+      await _agregarColumna(d, 'trabajos', 'nMotor', vacia);
+      await _agregarColumna(d, 'trabajos', 'vin', vacia);
+      await _agregarColumna(d, 'inventario', 'proveedor', vacia);
     }
   }
 
@@ -316,22 +329,6 @@ class AppDatabase {
   static const String _indiceFotos =
       'CREATE INDEX ix_fotos_trabajo ON fotos(trabajoId, momento, orden)';
 
-  /// Los renglones van como JSON en `detalle`, igual que los repuestos de un
-  /// trabajo. El total no se guarda: se suma de los renglones, y así nunca
-  /// puede contradecirlos.
-  static const String _tablaCompras = '''
-    CREATE TABLE compras (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      fecha     TEXT NOT NULL,
-      proveedor TEXT NOT NULL DEFAULT '',
-      boleta    TEXT NOT NULL DEFAULT '',
-      detalle   TEXT NOT NULL DEFAULT '[]'
-    )
-  ''';
-
-  static const String _indiceCompras =
-      'CREATE INDEX ix_compras_fecha ON compras(fecha)';
-
   /// El esquema, en el orden en que se crea.
   ///
   /// Van sentencias sueltas y no un batch a propósito: esto corre una sola vez
@@ -350,6 +347,10 @@ class AppDatabase {
         facturarA          TEXT    NOT NULL DEFAULT '',
         equipo             TEXT    NOT NULL DEFAULT '',
         modelo             TEXT    NOT NULL DEFAULT '',
+        placa              TEXT    NOT NULL DEFAULT '',
+        anio               TEXT    NOT NULL DEFAULT '',
+        nMotor             TEXT    NOT NULL DEFAULT '',
+        vin                TEXT    NOT NULL DEFAULT '',
         ubicacion          TEXT    NOT NULL DEFAULT '',
         movilidad          TEXT    NOT NULL DEFAULT 'cliente',
         vueltas            INTEGER NOT NULL DEFAULT 0,
@@ -382,6 +383,7 @@ class AppDatabase {
         stock        INTEGER NOT NULL DEFAULT 0,
         precio       REAL    NOT NULL DEFAULT 0,
         precioCosto  REAL    NOT NULL DEFAULT 0,
+        proveedor    TEXT    NOT NULL DEFAULT '',
         codigoBarras TEXT
       )
     ''',
@@ -410,8 +412,6 @@ class AppDatabase {
     'CREATE INDEX ix_rec_trabajo ON recordatorios(trabajoId)',
     _tablaFotos,
     _indiceFotos,
-    _tablaCompras,
-    _indiceCompras,
     '''
       CREATE TABLE negocio (
         id        INTEGER PRIMARY KEY,

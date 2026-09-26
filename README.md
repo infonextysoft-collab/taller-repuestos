@@ -65,10 +65,14 @@ ahí se decide qué implementación concreta cumple cada contrato. Y
 - **La mano de obra no lleva cantidad**: un trabajo se cobra por lo acordado.
 - **El stock se mueve al agregar y al quitar cada línea**, no al guardar el
   registro; salir sin guardar restaura el inventario al estado que tenía.
-- **El stock sube por dos puertas distintas, y es a propósito.** "Registrar
-  compra" deja rastro —proveedor, boleta, fecha y a cuánto—; "Ajustar stock"
-  corrige un conteo y no pregunta nada. Meterlas en el mismo formulario
-  obligaría a inventar un proveedor para arreglar un número.
+- **El repuesto se edita en un solo lugar.** Precios, proveedor y stock viven
+  en el mismo formulario: corregir un conteo es cambiar un número, no llenar
+  un trámite. Hubo una versión con compras en tabla aparte —proveedor,
+  boleta, renglones— y se sacó: para un taller era mucho papeleo para
+  contestar una sola pregunta, de quién se compra.
+- **La placa es el único dato del vehículo que se pide.** Año, número de
+  motor y VIN son opcionales y **salen impresos solo si se cargan**: un motor
+  eléctrico o un compresor no tienen ninguno.
 - **El costo se congela en la línea, no se lee del inventario.** Si mañana
   sube el precio de compra, lo que se ganó ayer no se mueve.
 - **Cero en el precio de compra significa "no se sabe", no "es gratis".** La

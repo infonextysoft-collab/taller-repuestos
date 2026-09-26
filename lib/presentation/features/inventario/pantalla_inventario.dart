@@ -14,7 +14,6 @@ import '../../../domain/entities/repuesto.dart';
 import '../../comunes/filtro_chips.dart';
 import 'formulario_repuesto.dart';
 import 'hoja_repuesto.dart';
-import 'pantalla_compra.dart';
 
 enum _FiltroStock { todos, conStock, agotados }
 
@@ -86,16 +85,6 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
     switch (accion) {
       case AccionRepuesto.editar:
         await _abrirFormulario(r);
-
-      case AccionRepuesto.ajustar:
-        final hecho = await mostrarAjusteStock(context, ref, r);
-        if (hecho && mounted) await _cargar();
-
-      case AccionRepuesto.comprar:
-        final hecho = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => PantallaCompra(inicial: r)),
-        );
-        if (hecho == true && mounted) await _cargar();
 
       case AccionRepuesto.eliminar:
         await _eliminar(r);
