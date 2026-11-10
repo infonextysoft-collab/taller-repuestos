@@ -1,9 +1,12 @@
 # MS — trabajos, repuestos y documentos
 
 App para un técnico electricista/mecánico independiente. Registra cada trabajo o
-venta de repuestos y genera dos papeles: un **Reporte de servicio** y una
-**Boleta** (o dos boletas separadas). Además lleva inventario y recordatorios de
-mantenimiento.
+venta de repuestos y genera dos papeles: un **Reporte de trabajo** y una
+**Nota de venta** (o dos notas separadas, numeradas 1 de 2 y 2 de 2). Además
+lleva inventario y avisos de mantenimiento.
+
+En el código la nota de venta sigue llamándose `Boleta`; solo cambió el nombre
+que se ve.
 
 Tres reglas de producto que mandan sobre todo lo demás:
 
@@ -60,11 +63,15 @@ ahí se decide qué implementación concreta cumple cada contrato. Y
   menos el descuento, ni un sol más.
 - **El traslado se cobra solo en campo Y con movilidad propia.** Las dos
   condiciones, siempre.
-- **Dos boletas separadas suman exactamente lo mismo que la junta**, total e
+- **Dos notas de venta separadas suman exactamente lo mismo que la junta**, total e
   IGV. Por eso el descuento y el impuesto de la segunda salen por diferencia.
 - **La mano de obra no lleva cantidad**: un trabajo se cobra por lo acordado.
 - **El stock se mueve al agregar y al quitar cada línea**, no al guardar el
   registro; salir sin guardar restaura el inventario al estado que tenía.
+- **El conteo del almacén se corrige de una pasada.** "Actualizar stock"
+  abre la lista entera con un contador por repuesto y un solo Guardar, y solo
+  escribe los que cambiaron. Volver un número a como estaba borra el cambio,
+  para que el botón no prometa guardar algo que no cambia nada.
 - **El repuesto se edita en un solo lugar.** Precios, proveedor y stock viven
   en el mismo formulario: corregir un conteo es cambiar un número, no llenar
   un trámite. Hubo una versión con compras en tabla aparte —proveedor,
@@ -73,17 +80,45 @@ ahí se decide qué implementación concreta cumple cada contrato. Y
 - **La placa es el único dato del vehículo que se pide.** Año, número de
   motor y VIN son opcionales y **salen impresos solo si se cargan**: un motor
   eléctrico o un compresor no tienen ninguno.
+- **El descuento va por línea, en porcentaje, y ya viene restado en el
+  importe.** Los subtotales que calcula la app son netos: nunca se suma
+  `cantidad × precio` por un lado y se descuenta por otro. Un porcentaje
+  imposible se corta en 100 — la línea puede quedar en cero, nunca en
+  negativo.
 - **El costo se congela en la línea, no se lee del inventario.** Si mañana
   sube el precio de compra, lo que se ganó ayer no se mueve.
 - **Cero en el precio de compra significa "no se sabe", no "es gratis".** La
   ganancia entonces se muestra como un techo y dice cuántos repuestos no
   tienen costo cargado, en vez de suponer que salieron gratis e inflarla.
-- **La ganancia no sale impresa.** Ni en la boleta ni en el reporte de
+- **La ganancia no sale impresa.** Ni en la nota de venta ni en el reporte de
   servicio: es un número interno, el cliente no tiene por qué verlo.
+- **La ganancia se parte en dos: mano de obra e inventario.** Lo que se cobra
+  por trabajar es ganancia entera —el tiempo y la camioneta son tuyos—; lo de
+  las piezas es lo vendido menos lo que costó reponerlas. El descuento de la
+  boleta se reparte **en proporción** entre las dos mitades, con la misma
+  regla que usa la boleta separada, y a las piezas se les asigna lo que falta
+  para llegar al total: así las dos partes suman exactamente lo cobrado.
+- **La nota de venta es una sola tabla**, con Mano de obra y Repuestos como
+  secciones adentro y las columnas alineadas de arriba abajo, más los totales
+  pegados debajo con el borde alineado a la última columna. De los datos del
+  cliente para abajo va **todo en mayúsculas**, que es como se leen las
+  notas de taller. El reporte de trabajo no va en mayúsculas: no es un
+  comprobante. En los dos documentos los rótulos de cada bloque van
+  **centrados, en negro y con una raya negra debajo**, de lado a lado, para que no se
+  confundan con un renglón más y se vea dónde empieza cada bloque.
+- **Con qué pagar va como pie de página**: anclado abajo de la hoja, a la
+  izquierda, en un recuadro rotulado "FORMAS DE PAGO". Es pie de página y no
+  el último bloque del contenido porque, en una boleta corta, el último bloque
+  queda a media hoja y eso no es "el pie". El desagregado del IGV, en cambio,
+  se queda pegado debajo de los totales: es parte de la cuenta.
+- **El banco se elige de una lista** (BCP, BBVA, Interbank, las cajas…) con
+  "Otro…" al final, que abre un campo para escribirlo. Así el nombre sale
+  igual en todas las boletas, y la lista no necesita estar completa ni al día:
+  lo que falte se carga a mano una vez.
 - **Lo vendido se cuenta leyendo los trabajos**, que son la fuente, y no una
   tabla de movimientos aparte. Un registro paralelo habría que corregirlo a
   mano cada vez que un trabajo se edita o se borra.
-- **Los datos de pago van impresos en la boleta**, además de viajar en el
+- **Los datos de pago van impresos en la nota de venta**, además de viajar en el
   mensaje al compartirla: **WhatsApp descarta el texto cuando lo adjuntado es
   un PDF**, así que el papel es el único camino que no depende de por dónde se
   mande. Al compartir también quedan en el portapapeles, para pegarlos.
@@ -116,6 +151,28 @@ ahí se decide qué implementación concreta cumple cada contrato. Y
 - **Los recordatorios se repiten con un intervalo libre** (N días, semanas,
   meses o años) y la cuenta se hace **en la unidad elegida**: "cada 3 meses"
   desde un 31 de enero cae el 30 de abril, no noventa días después.
+- **Un aviso cuenta en el mes de su fecha programada**, no en el día en que se
+  atendió, y cada repetición cuenta aparte. "Sin cumplir" es lo que ya pasó y
+  nadie marcó: lo que todavía no llega no se debe. Un cumplido no se desmarca,
+  por eso el botón ✓ pregunta antes.
+- **Eliminar un aviso no borra la fila.** Queda en el historial del mes, en
+  gris, no cuenta en el "X de Y" ni en el número rojo, y solo se va con "Borrar
+  para siempre". Si se repite se puede dejar de repetir, eliminar solo ese (el
+  siguiente se programa igual) o eliminarlo y dejar de repetir.
+- **El PDF no deja nada huérfano al cambiar de hoja.** Un título se queda con
+  el encabezado y los dos primeros renglones de su tabla; el total, con los dos
+  últimos renglones; los renglones no se cortan y las tablas que siguen en otra
+  hoja repiten su encabezado. Los bloques que no se pueden separar tienen un
+  tope de alto: uno más alto que la hoja colgaría el armado para siempre.
+- **Al compartir o descargar se eligen los papeles** con casillas, en un solo
+  PDF. Una venta simple no
+  pregunta porque tiene un solo papel posible.
+- **Un código de barras es de un solo repuesto**, y se revisa al escanearlo o
+  escribirlo, no al guardar. Se comparan sin mayúsculas y sin el cero de
+  adelante del EAN-13, que un lector pone y otro no.
+- **El RUC puede venir fijo desde la compilación** y entonces no se puede
+  cambiar en la app, ni restaurando un respaldo. Va en un archivo privado que
+  Git ignora: este repositorio es público.
 
 Todo eso está cubierto por tests: `flutter test`.
 
@@ -203,8 +260,13 @@ Chrome para mirar.
 ### El APK
 
 ```bash
-flutter build apk --release
+flutter build apk --release --dart-define-from-file=config_privada.json
 ```
+
+`config_privada.json` lleva el RUC fijo y **no se sube a Git**. Para crearlo, se
+copia `config_privada.example.json` y se llena. Sin ese archivo se compila igual
+quitando `--dart-define-from-file`, y el RUC se escribe a mano en la app. La
+versión web se publica siempre sin él.
 
 Queda en `build/app/outputs/flutter-apk/app-release.apk`. En Windows,
 `android/gradle.properties` apaga la compilación incremental de Kotlin: con ella

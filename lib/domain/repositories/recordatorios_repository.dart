@@ -6,7 +6,12 @@ import '../entities/trabajo.dart';
 abstract class RecordatoriosRepository {
   Future<Recordatorio?> obtener(int id);
 
-  Future<List<Recordatorio>> listar({bool incluirCumplidos = true});
+  /// Los eliminados solo se piden desde el historial: para todo lo demás —el
+  /// número rojo, "hoy toca"— es como si ya no estuvieran.
+  Future<List<Recordatorio>> listar({
+    bool incluirCumplidos = true,
+    bool incluirEliminados = false,
+  });
 
   /// Los mismos, agrupados por mes para la lista.
   Future<List<GrupoRecordatorios>> listarPorMes({bool incluirCumplidos = true});
@@ -21,10 +26,24 @@ abstract class RecordatoriosRepository {
 
   /// Si le cambian la fecha, recalcula el estado: reprogramar un vencido para
   /// más adelante tiene que devolverlo a pendiente, o seguiría contando en el
-  /// aviso rojo con una fecha que ya no vencía. Los cumplidos no se tocan.
+  /// aviso rojo con una fecha que ya no vencía. Los cumplidos y los eliminados
+  /// no cambian de estado.
   Future<void> actualizar(Recordatorio recordatorio);
 
+  /// Lo pasa al historial como eliminado, sin programar el siguiente.
   Future<void> eliminar(int id);
+
+  /// Lo pasa al historial como eliminado **y programa el siguiente**: se
+  /// saltea esta vez, el mantenimiento sigue.
+  ///
+  /// Devuelve el id del siguiente, o `null` si no se repite.
+  Future<int?> eliminarYSeguir(int id);
+
+  /// Este se queda donde está, pero al cumplirlo ya no nace otro.
+  Future<void> dejarDeRepetir(int id);
+
+  /// Borra de verdad. Solo funciona con los que ya están eliminados.
+  Future<void> borrarParaSiempre(int id);
 
   /// Marca o desmarca como importante.
   Future<void> marcarImportante(int id, bool importante);

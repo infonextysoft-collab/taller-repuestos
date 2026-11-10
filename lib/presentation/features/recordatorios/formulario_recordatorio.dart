@@ -87,6 +87,7 @@ class _FormularioRecordatorioState
       repite: _repetir,
       estado: base?.estado ?? EstadoRecordatorio.pendiente,
       origen: base?.origen ?? OrigenRecordatorio.manual,
+      importante: base?.importante ?? false,
       trabajoId: base?.trabajoId,
       cliente: _cliente.text.trim().isEmpty ? null : _cliente.text.trim(),
       equipo: _equipo.text.trim().isEmpty ? null : _equipo.text.trim(),
@@ -104,93 +105,97 @@ class _FormularioRecordatorioState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_esEdicion ? 'Editar recordatorio' : 'Nuevo recordatorio'),
-      ),
+      appBar: AppBar(title: Text(_esEdicion ? 'Editar aviso' : 'Nuevo aviso')),
       body: Form(
         key: _form,
         child: ListView(
-        padding: const EdgeInsets.only(top: Espacio.lg, bottom: Espacio.xxl),
-        children: [
-          Contenido(
-            ancho: Ancho.acciones,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Campo(
-                  etiqueta: 'Qué hay que recordar',
-                  controlador: _descripcion,
-                  ejemplo: 'Ej. Cambio de aceite del compresor',
-                  lineas: 3,
-                  autofoco: !_esEdicion,
-                  validador: Valida.todos([
-                    Valida.obligatorio('qué hay que recordar'),
-                    Valida.minimo(4, 'La descripción'),
-                  ]),
-                ),
-                const SizedBox(height: Espacio.lg),
-                Seccion(
-                  titulo: 'Cuándo',
-                  child: InkWell(
-                    onTap: _elegirFecha,
-                    borderRadius: Redondeo.brChico,
-                    child: Container(
-                      padding: const EdgeInsets.all(Espacio.md),
-                      decoration: BoxDecoration(
-                        color: Tono.fondo,
-                        borderRadius: Redondeo.brChico,
-                        border: Border.all(color: Tono.linea),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.event_rounded,
-                              size: 19, color: Tono.texto2),
-                          const SizedBox(width: Espacio.md),
-                          Expanded(
-                            child: Text(
-                              formatoLargo(_fecha),
-                              style: Theme.of(context).textTheme.bodyLarge,
+          padding: const EdgeInsets.only(top: Espacio.lg, bottom: Espacio.xxl),
+          children: [
+            Contenido(
+              ancho: Ancho.acciones,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Campo(
+                    etiqueta: 'Qué hay que recordar',
+                    controlador: _descripcion,
+                    ejemplo: 'Ej. Cambio de aceite del compresor',
+                    lineas: 3,
+                    autofoco: !_esEdicion,
+                    validador: Valida.todos([
+                      Valida.obligatorio('qué hay que recordar'),
+                      Valida.minimo(4, 'La descripción'),
+                    ]),
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Seccion(
+                    titulo: 'Cuándo',
+                    child: InkWell(
+                      onTap: _elegirFecha,
+                      borderRadius: Redondeo.brChico,
+                      child: Container(
+                        padding: const EdgeInsets.all(Espacio.md),
+                        decoration: BoxDecoration(
+                          color: Tono.fondo,
+                          borderRadius: Redondeo.brChico,
+                          border: Border.all(color: Tono.linea),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.event_rounded,
+                              size: 19,
+                              color: Tono.texto2,
                             ),
-                          ),
-                          if (estaVencida(_fecha))
-                            const Insignia('Ya pasó',
-                                color: Tono.vino, fondo: Tono.vinoSuave),
-                        ],
+                            const SizedBox(width: Espacio.md),
+                            Expanded(
+                              child: Text(
+                                formatoLargo(_fecha),
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                            if (estaVencida(_fecha))
+                              const Insignia(
+                                'Ya pasó',
+                                color: Tono.vino,
+                                fondo: Tono.vinoSuave,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: Espacio.lg),
-                Seccion(
-                  titulo: 'Repetir',
-                  child: SelectorRepeticion(
-                    valor: _repetir,
-                    desde: _fecha,
-                    onCambio: (v) => setState(() => _repetir = v),
+                  const SizedBox(height: Espacio.lg),
+                  Seccion(
+                    titulo: 'Repetir',
+                    child: SelectorRepeticion(
+                      valor: _repetir,
+                      desde: _fecha,
+                      onCambio: (v) => setState(() => _repetir = v),
+                    ),
                   ),
-                ),
-                const SizedBox(height: Espacio.lg),
-                Campo(
-                  etiqueta: 'Cliente',
-                  controlador: _cliente,
-                  ejemplo: 'De quién es',
-                  opcional: true,
-                ),
-                const SizedBox(height: Espacio.lg),
-                Campo(
-                  etiqueta: 'Equipo',
-                  controlador: _equipo,
-                  ejemplo: 'Sobre qué equipo',
-                  opcional: true,
-                ),
-              ],
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Cliente',
+                    controlador: _cliente,
+                    ejemplo: 'De quién es',
+                    opcional: true,
+                  ),
+                  const SizedBox(height: Espacio.lg),
+                  Campo(
+                    etiqueta: 'Equipo',
+                    controlador: _equipo,
+                    ejemplo: 'Sobre qué equipo',
+                    opcional: true,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
       bottomNavigationBar: BarraAccion(
-        texto: _esEdicion ? 'Guardar cambios' : 'Crear recordatorio',
+        texto: _esEdicion ? 'Guardar cambios' : 'Crear aviso',
         habilitado: !_guardando,
         onTap: _guardar,
       ),

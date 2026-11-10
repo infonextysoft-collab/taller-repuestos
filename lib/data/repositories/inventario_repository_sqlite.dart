@@ -1,5 +1,6 @@
 import 'package:sqflite_common/sqlite_api.dart';
 
+import '../../core/utils/codigo_barras.dart';
 import '../../core/utils/texto.dart';
 import '../../domain/entities/linea.dart';
 import '../../domain/entities/repuesto.dart';
@@ -35,7 +36,18 @@ class InventarioRepositorySqlite implements InventarioRepository {
     if (c == null) return null;
     final filas = await _db
         .query('inventario', where: 'codigoBarras = ?', whereArgs: [c], limit: 1);
-    return filas.isEmpty ? null : Repuesto.fromRow(filas.first);
+    if (filas.isNotEmpty) return Repuesto.fromRow(filas.first);
+
+    // El mismo código escrito de otra forma: en minúsculas, o con el cero de
+    // adelante que un lector pone y otro no.
+    final buscado = codigoParaComparar(c);
+    final conCodigo =
+        await _db.query('inventario', where: 'codigoBarras IS NOT NULL');
+    for (final fila in conCodigo) {
+      final item = Repuesto.fromRow(fila);
+      if (codigoParaComparar(item.codigoBarras ?? '') == buscado) return item;
+    }
+    return null;
   }
 
   @override

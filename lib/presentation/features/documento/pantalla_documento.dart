@@ -11,7 +11,7 @@ import '../../../core/widgets/avisos.dart';
 import '../../../domain/entities/totales.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../../domain/services/calculadora_totales.dart';
-import '../../comunes/salida_pdf.dart';
+import '../../comunes/elegir_documentos.dart';
 
 enum _Salida { descargar, compartir }
 
@@ -47,6 +47,9 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
   /// dos toques seguidos no pueden generar dos PDF.
   _Salida? _enCurso;
 
+  /// Desde que se toca el botón hasta que termina, ventana incluida.
+  bool _ocupado = false;
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +72,7 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
     if (t == null) return const [];
     return [
       // Una venta simple no lleva reporte: no hubo servicio que reportar.
-      if (t.tipo.llevaReporte) 'Reporte de servicio',
+      if (t.tipo.llevaReporte) 'Reporte de trabajo',
       for (final b in _boletas) b.titulo,
     ];
   }
@@ -94,8 +97,6 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
       titulo: '¿Eliminar ${t.codigo}?',
       mensaje: 'No se puede deshacer. Los repuestos que tenía cargados vuelven '
           'al inventario.',
-      aceptar: 'Eliminar',
-      cancelar: 'Permanecer',
       destructivo: true,
     );
     if (!seguro || !mounted) return;
@@ -108,30 +109,24 @@ class _PantallaDocumentoState extends ConsumerState<PantallaDocumento> {
     Navigator.of(context).pop();
   }
 
-  /// Saca el documento **completo** —reporte y boleta(s)— y no solo la
-  /// pestaña abierta: es un solo papel para el cliente.
+  /// Pregunta qué papeles van y saca esos, sin importar qué pestaña esté
+  /// abierta: el dueño del vehículo y el contador no reciben lo mismo.
   Future<void> _sacar(_Salida salida) async {
-    if (_enCurso != null) return;
-    setState(() => _enCurso = salida);
+    if (_ocupado) return;
+    _ocupado = true;
 
     try {
-      final t = _trabajo!;
-      final negocio = ref.read(negocioProvider);
-      final bytes = await ref.read(generadorPdfProvider).completo(t, negocio);
-      final nombre = '${t.codigo}.pdf';
-
-      switch (salida) {
-        case _Salida.descargar:
-          if (mounted) await descargarPdf(context, bytes, nombre);
-        case _Salida.compartir:
-          await compartirPdf(bytes, nombre,
-              mensaje: mensajeDeEnvio(t, negocio));
-      }
-    } catch (e) {
-      if (mounted) {
-        mostrarAviso(context, 'No se pudo sacar el PDF: $e', problema: true);
-      }
+      await sacarDocumentos(
+        context,
+        ref,
+        _trabajo!,
+        compartir: salida == _Salida.compartir,
+        alArmar: () {
+          if (mounted) setState(() => _enCurso = salida);
+        },
+      );
     } finally {
+      _ocupado = false;
       if (mounted) setState(() => _enCurso = null);
     }
   }

@@ -14,7 +14,11 @@ import 'repeticion.dart';
 ///                         └─ si `repite != null`, nace uno NUEVO pendiente
 ///                            con fecha = programada + el intervalo
 /// ```
-enum EstadoRecordatorio { pendiente, vencido, cumplido }
+///
+/// [eliminado] también es final, y no borra la fila: se queda en el historial
+/// del mes, en gris, hasta que alguien pida borrarlo para siempre. No cuenta
+/// en el avance del mes ni en ningún aviso.
+enum EstadoRecordatorio { pendiente, vencido, cumplido, eliminado }
 
 enum OrigenRecordatorio { automatico, manual }
 
@@ -31,6 +35,8 @@ class Recordatorio {
     this.trabajoId,
     this.cliente,
     this.equipo,
+    this.cumplidoEl,
+    this.eliminadoEl,
   });
 
   final int? id;
@@ -55,8 +61,19 @@ class Recordatorio {
   final String? cliente;
   final String? equipo;
 
+  /// Qué día se marcó, ISO corto. Los cumplidos de antes de que existiera
+  /// este dato no lo tienen.
+  final String? cumplidoEl;
+
+  /// Qué día se eliminó, ISO corto.
+  final String? eliminadoEl;
+
   bool get seRepite => repite != null && repite!.valida;
   bool get cumplido => estado == EstadoRecordatorio.cumplido;
+  bool get eliminado => estado == EstadoRecordatorio.eliminado;
+
+  /// Todavía hay algo que hacer con él: ni cumplido ni eliminado.
+  bool get activo => !cumplido && !eliminado;
 
   Recordatorio copyWith({
     int? id,
@@ -70,6 +87,8 @@ class Recordatorio {
     int? trabajoId,
     String? cliente,
     String? equipo,
+    String? cumplidoEl,
+    String? eliminadoEl,
   }) =>
       Recordatorio(
         id: id ?? this.id,
@@ -82,6 +101,8 @@ class Recordatorio {
         trabajoId: trabajoId ?? this.trabajoId,
         cliente: cliente ?? this.cliente,
         equipo: equipo ?? this.equipo,
+        cumplidoEl: cumplidoEl ?? this.cumplidoEl,
+        eliminadoEl: eliminadoEl ?? this.eliminadoEl,
       );
 
   Map<String, Object?> toRow() => {
@@ -96,6 +117,8 @@ class Recordatorio {
         'trabajoId': trabajoId,
         'cliente': cliente,
         'equipo': equipo,
+        'cumplidoEl': cumplidoEl,
+        'eliminadoEl': eliminadoEl,
       };
 
   factory Recordatorio.fromRow(Map<String, Object?> r) => Recordatorio(
@@ -119,6 +142,8 @@ class Recordatorio {
         trabajoId: (r['trabajoId'] as num?)?.toInt(),
         cliente: r['cliente']?.toString(),
         equipo: r['equipo']?.toString(),
+        cumplidoEl: r['cumplidoEl']?.toString(),
+        eliminadoEl: r['eliminadoEl']?.toString(),
       );
 }
 

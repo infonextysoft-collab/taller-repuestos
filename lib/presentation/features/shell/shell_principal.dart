@@ -153,8 +153,6 @@ class _ShellPrincipalState extends ConsumerState<ShellPrincipal> {
           titulo: '¿Cerrar sesión?',
           mensaje: 'Los datos quedan en el dispositivo. Solo te vuelve a '
               'pedir la contraseña.',
-          aceptar: 'Cerrar sesión',
-          cancelar: 'Permanecer',
           destructivo: true,
         );
         if (seguro) await widget.alSalir();

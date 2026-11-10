@@ -146,7 +146,6 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
       mensaje: 'Entras con la contraseña de siempre y este teléfono deja de '
           'usar el correo para recuperarla. Puedes volver a vincularlo desde '
           'el menú del negocio.',
-      aceptar: 'Seguir sin el correo',
     );
     if (!seguro || !mounted) return;
 
@@ -182,7 +181,6 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
       titulo: '¿Te mandamos un enlace?',
       mensaje: 'Va a ${ocultarCorreo(correo)}. Ábrelo, pon una contraseña '
           'nueva y entra con ella aquí.',
-      aceptar: 'Enviar enlace',
     );
     if (!seguro || !mounted) return;
 

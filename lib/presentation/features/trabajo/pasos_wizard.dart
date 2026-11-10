@@ -234,7 +234,7 @@ class _ClienteEquipo extends StatelessWidget {
       children: [
         const _Encabezado(
           titulo: '¿Para quién es el trabajo?',
-          detalle: 'Estos datos van impresos en el reporte y en la boleta.',
+          detalle: 'Estos datos van impresos en el reporte y en la nota de venta.',
         ),
         Campo(
           etiqueta: 'Cliente',
@@ -595,7 +595,7 @@ class _Diagnostico extends StatelessWidget {
         children: [
           _Encabezado(
             titulo: 'Qué encontraste',
-            detalle: 'Va tal cual en el reporte de servicio.',
+            detalle: 'Va tal cual en el reporte de trabajo.',
             secundario: secundario,
           ),
           Campo(
@@ -824,13 +824,16 @@ class _Totales extends StatelessWidget {
         ResumenTotales(totales: ctrl.totales),
         const SizedBox(height: Espacio.xl),
         Campo(
-          etiqueta: 'Descuento',
+          // "del total" para no confundirlo con el "% Dto." de cada línea:
+          // este es en soles y sobre todo el trabajo.
+          etiqueta: 'Descuento del total',
           controlador: campos.descuento,
           ejemplo: '0.00',
           opcional: true,
           teclado: const TextInputType.numberWithOptions(decimal: true),
           formateadores: [decimalFormato],
-          ayuda: 'Se resta del total, antes de desagregar el IGV.',
+          ayuda: 'En soles, sobre todo el trabajo. Se resta antes de '
+              'desagregar el IGV. Para rebajar una sola línea está su % Dto.',
           habilitado: !bloqueado,
           validador: Valida.descuento(() => ctrl.totales.subtotal),
           onCambio: (v) =>
@@ -843,7 +846,7 @@ class _Totales extends StatelessWidget {
             children: [
               _OpcionAncha(
                 icono: Icons.description_rounded,
-                texto: 'Una sola boleta',
+                texto: 'Una sola nota de venta',
                 detalle: 'Mano de obra y repuestos juntos.',
                 activo: !separado,
                 onTap: bloqueado
@@ -854,7 +857,7 @@ class _Totales extends StatelessWidget {
               const SizedBox(height: Espacio.md),
               _OpcionAncha(
                 icono: Icons.splitscreen_rounded,
-                texto: 'Dos boletas separadas',
+                texto: 'Dos notas de venta separadas',
                 detalle: 'Mano de obra por un lado, repuestos por el otro.',
                 activo: separado,
                 onTap: bloqueado

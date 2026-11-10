@@ -14,12 +14,22 @@ import '../entities/trabajo.dart';
 ///   3. El traslado cuenta dentro de la mano de obra en la boleta separada.
 ///   4. El descuento se resta **antes** de desagregar el IGV, así el impuesto
 ///      sale sobre lo que realmente se cobró.
+///   5. Cada línea puede traer su propio descuento en porcentaje. Ese ya
+///      viene restado en su importe, así que los subtotales son netos.
 class CalculadoraTotales {
   const CalculadoraTotales();
 
-  /// Suma los importes de un grupo de líneas.
+  /// Suma los importes de un grupo de líneas, **ya con su descuento**.
+  ///
+  /// Se suma `importe` y no `cant × precio`: el descuento de una línea es
+  /// parte de lo que esa línea vale, no un ajuste que se hace después.
   double sumarLineas(Iterable<LineaDocumento> lineas) =>
-      redondear(lineas.fold<double>(0, (acc, l) => acc + l.cant * l.precio));
+      redondear(lineas.fold<double>(0, (acc, l) => acc + l.importe));
+
+  /// Lo que se rebajó línea por línea. Solo para mostrarlo: ya está
+  /// descontado de los subtotales.
+  double sumarRebajas(Iterable<LineaDocumento> lineas) =>
+      redondear(lineas.fold<double>(0, (acc, l) => acc + l.rebaja));
 
   /// Cuánto se cobra de traslado.
   ///
@@ -76,7 +86,7 @@ class CalculadoraTotales {
     if (t.vistaDoc != VistaDoc.separado) {
       return [
         Boleta(
-          titulo: 'Boleta',
+          titulo: 'Nota de venta',
           subtotal: tot.subtotal,
           descuento: tot.descuento,
           gravado: tot.gravado,
@@ -106,7 +116,7 @@ class CalculadoraTotales {
 
     return [
       Boleta(
-        titulo: 'Boleta de Mano de Obra',
+        titulo: 'Nota de venta de mano de obra',
         subtotal: baseMO,
         descuento: descMO,
         gravado: gravadoMO,
@@ -115,7 +125,7 @@ class CalculadoraTotales {
         incluyeRepuestos: false,
       ),
       Boleta(
-        titulo: 'Boleta de Repuestos',
+        titulo: 'Nota de venta de repuestos',
         subtotal: baseRep,
         descuento: descRep,
         gravado: gravadoRep,

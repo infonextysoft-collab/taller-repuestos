@@ -9,8 +9,21 @@ abstract class LineaDocumento {
   /// Cuántas unidades entran en el importe. La mano de obra siempre vale 1.
   num get cant;
 
-  /// `cant × precio`, ya redondeado.
-  double get importe => redondear(cant * precio);
+  /// Descuento de **esta** línea, en porcentaje. 0 es lo normal.
+  ///
+  /// Va por línea y no una sola vez por boleta porque así se rebaja lo que
+  /// de verdad se rebajó —un repuesto, un trabajo— y el papel lo muestra al
+  /// lado del precio en vez de al pie, donde nadie sabe de qué salió.
+  double get dto;
+
+  /// `cant × precio`, menos el descuento de la línea, ya redondeado.
+  double get importe => redondear(cant * precio * (1 - dtoValido / 100));
+
+  /// El porcentaje acotado: un descuento de 130 % devolvería plata.
+  double get dtoValido => dto.clamp(0, 100).toDouble();
+
+  /// Cuánta plata rebajó el descuento. Cero si no hay.
+  double get rebaja => redondear(cant * precio - importe);
 }
 
 /// Una línea de **mano de obra**.
@@ -19,27 +32,45 @@ abstract class LineaDocumento {
 /// cobra por lo que se acordó. Pedir "cantidad 1" en cada línea era un campo
 /// que nadie cambiaba nunca y una pulsación más en el celular.
 class LineaMano implements LineaDocumento {
-  const LineaMano({required this.desc, required this.precio});
+  const LineaMano({required this.desc, required this.precio, this.dto = 0});
 
   @override
   final String desc;
   @override
   final double precio;
+  @override
+  final double dto;
 
   @override
   num get cant => 1;
 
   @override
-  double get importe => redondear(precio);
+  double get dtoValido => dto.clamp(0, 100).toDouble();
 
-  LineaMano copyWith({String? desc, double? precio}) =>
-      LineaMano(desc: desc ?? this.desc, precio: precio ?? this.precio);
+  @override
+  double get importe => redondear(precio * (1 - dtoValido / 100));
 
-  Map<String, dynamic> toJson() => {'desc': desc, 'precio': precio};
+  @override
+  double get rebaja => redondear(precio - importe);
+
+  LineaMano copyWith({String? desc, double? precio, double? dto}) => LineaMano(
+        desc: desc ?? this.desc,
+        precio: precio ?? this.precio,
+        dto: dto ?? this.dto,
+      );
+
+  // El descuento no se escribe cuando es cero: las líneas viejas no lo tienen
+  // y las nuevas sin rebaja tampoco tienen por qué engordar la fila.
+  Map<String, dynamic> toJson() => {
+        'desc': desc,
+        'precio': precio,
+        if (dto > 0) 'dto': dto,
+      };
 
   factory LineaMano.fromJson(Map<String, dynamic> j) => LineaMano(
         desc: (j['desc'] ?? '').toString(),
         precio: (j['precio'] as num?)?.toDouble() ?? 0,
+        dto: (j['dto'] as num?)?.toDouble() ?? 0,
       );
 }
 
@@ -55,6 +86,7 @@ class LineaRepuesto implements LineaDocumento {
     this.origen = OrigenRepuesto.externo,
     this.inventarioId,
     this.costo,
+    this.dto = 0,
   });
 
   @override
@@ -63,6 +95,8 @@ class LineaRepuesto implements LineaDocumento {
   @override
   final double precio;
   final OrigenRepuesto origen;
+  @override
+  final double dto;
 
   /// Solo tiene valor si [origen] es `inventario`.
   final int? inventarioId;
@@ -87,7 +121,14 @@ class LineaRepuesto implements LineaDocumento {
       origen == OrigenRepuesto.inventario && inventarioId != null;
 
   @override
-  double get importe => redondear(cantidad * precio);
+  double get dtoValido => dto.clamp(0, 100).toDouble();
+
+  @override
+  double get importe =>
+      redondear(cantidad * precio * (1 - dtoValido / 100));
+
+  @override
+  double get rebaja => redondear(cantidad * precio - importe);
 
   LineaRepuesto copyWith({
     String? desc,
@@ -96,6 +137,7 @@ class LineaRepuesto implements LineaDocumento {
     OrigenRepuesto? origen,
     int? inventarioId,
     double? costo,
+    double? dto,
   }) =>
       LineaRepuesto(
         desc: desc ?? this.desc,
@@ -104,6 +146,7 @@ class LineaRepuesto implements LineaDocumento {
         origen: origen ?? this.origen,
         inventarioId: inventarioId ?? this.inventarioId,
         costo: costo ?? this.costo,
+        dto: dto ?? this.dto,
       );
 
   Map<String, dynamic> toJson() => {
@@ -113,6 +156,7 @@ class LineaRepuesto implements LineaDocumento {
         'origen': origen.name,
         'inventarioId': inventarioId,
         'costo': costo,
+        if (dto > 0) 'dto': dto,
       };
 
   factory LineaRepuesto.fromJson(Map<String, dynamic> j) => LineaRepuesto(
@@ -124,5 +168,6 @@ class LineaRepuesto implements LineaDocumento {
             : OrigenRepuesto.externo,
         inventarioId: (j['inventarioId'] as num?)?.toInt(),
         costo: (j['costo'] as num?)?.toDouble(),
+        dto: (j['dto'] as num?)?.toDouble() ?? 0,
       );
 }

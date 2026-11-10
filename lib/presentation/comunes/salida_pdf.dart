@@ -97,13 +97,16 @@ Future<String> _temporal(Uint8List bytes, String nombre) async {
 ///
 /// Sin datos de cobro cargados quedan las dos primeras líneas, que igual
 /// sirven de referencia en el chat.
-String mensajeDeEnvio(Trabajo t, Negocio n) {
+///
+/// [total] es para cuando se manda solo una de las dos notas: lo que se cobra
+/// en ese papel, no el del trabajo entero.
+String mensajeDeEnvio(Trabajo t, Negocio n, {double? total}) {
   final encabezado =
       [n.nombre.trim(), t.codigo].where((s) => s.isNotEmpty).join(' · ');
 
   final lineas = <String>[
     if (encabezado.isNotEmpty) encabezado,
-    'Total: ${soles(t.totales.total)}',
+    'Total: ${soles(total ?? t.totales.total)}',
   ];
 
   final pago = n.datosPago;

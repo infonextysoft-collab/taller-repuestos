@@ -6,35 +6,24 @@ import '../../../core/theme/movimiento.dart';
 import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/fechas.dart';
-import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/contenido.dart';
 import '../../../core/widgets/pulsable.dart';
 import '../../../domain/entities/recordatorio.dart';
+import '../../../domain/services/historial_avisos.dart';
 import '../shell/barra_inferior.dart';
-import 'formulario_recordatorio.dart';
+import 'acciones_aviso.dart';
+import 'pantalla_completados.dart';
+import 'pantalla_programados.dart';
+import 'tarjeta_aviso.dart';
 
-/// Las tres vistas de Recordatorios.
+/// Las dos fichas que muestran su lista debajo, sin cambiar de pantalla.
+enum _Vista { vencidos, hoy }
+
+/// Avisos: cuatro fichas grandes arriba y, debajo, lo que hay que atender.
 ///
-/// Son tres y no seis. Seis recortes obligan a leer una grilla entera antes de
-/// ver un solo recordatorio, y la mitad de ellos —"con lugar", "sin aviso"— son
-/// preguntas que nadie se hace en un taller.
-enum VistaAvisos { hoy, historial, importantes }
-
-extension _VistaAvisosX on VistaAvisos {
-  String get titulo => switch (this) {
-        VistaAvisos.hoy => 'Hoy',
-        VistaAvisos.historial => 'Historial',
-        VistaAvisos.importantes => 'Importantes',
-      };
-
-  IconData get icono => switch (this) {
-        VistaAvisos.hoy => Icons.today_rounded,
-        VistaAvisos.historial => Icons.history_rounded,
-        VistaAvisos.importantes => Icons.star_rounded,
-      };
-}
-
-/// Mantenimientos y avisos.
+/// Vencidos y Hoy se ven acá mismo porque son lo que se viene a resolver.
+/// Programados y Completados son para consultar: abren su propia pantalla, y
+/// la flechita de la ficha lo anuncia.
 class PantallaRecordatorios extends ConsumerStatefulWidget {
   const PantallaRecordatorios({super.key});
 
@@ -45,7 +34,9 @@ class PantallaRecordatorios extends ConsumerStatefulWidget {
 
 class _PantallaRecordatoriosState extends ConsumerState<PantallaRecordatorios> {
   List<Recordatorio> _todos = const [];
-  VistaAvisos _vista = VistaAvisos.hoy;
+
+  /// `null` hasta que se toque una ficha: mientras tanto se elige sola.
+  _Vista? _elegida;
   bool _cargando = true;
 
   @override
@@ -55,118 +46,50 @@ class _PantallaRecordatoriosState extends ConsumerState<PantallaRecordatorios> {
   }
 
   Future<void> _cargar() async {
-    final items = await ref.read(recordatoriosRepoProvider).listar();
-    if (mounted) {
-      setState(() {
-        _todos = items;
-        _cargando = false;
-      });
-    }
-  }
+    final repo = ref.read(recordatoriosRepoProvider);
+    // La app puede quedar abierta de un día para otro.
+    final recienVencidos = await repo.refrescarVencidos();
+    final items = await repo.listar();
 
-  /* ------------------------------------------------------------- recortes */
-
-  /// Lo que toca hoy: lo de hoy **y lo que ya venció**.
-  ///
-  /// Un vencido no deja de ser cosa de hoy por haber pasado de fecha: al
-  /// contrario, es lo primero que hay que resolver. Separarlo en otra pestaña
-  /// sería esconder justo lo que hay que hacer.
-  List<Recordatorio> get _paraHoy {
-    final hoy = hoyISO();
-    final items = _todos
-        .where((r) => !r.cumplido && r.fecha.compareTo(hoy) <= 0)
-        .toList()
-      ..sort((a, b) => a.fecha.compareTo(b.fecha));
-    return items;
-  }
-
-  List<Recordatorio> get _importantes =>
-      _todos.where((r) => r.importante && !r.cumplido).toList();
-
-  /// Los tres últimos cumplidos, del más reciente al más viejo.
-  List<Recordatorio> get _ultimosCumplidos {
-    final items = _todos.where((r) => r.cumplido).toList()
-      ..sort((a, b) => b.fecha.compareTo(a.fecha));
-    return items.take(3).toList();
-  }
-
-  List<GrupoRecordatorios> get _porMes {
-    final grupos = <String, List<Recordatorio>>{};
-    final ordenados = [..._todos]..sort((a, b) => b.fecha.compareTo(a.fecha));
-    for (final r in ordenados) {
-      grupos.putIfAbsent(claveMes(r.fecha), () => []).add(r);
-    }
-    return grupos.entries
-        .map((e) => GrupoRecordatorios(e.key, e.value))
-        .toList();
-  }
-
-  int _cuantos(VistaAvisos v) => switch (v) {
-        VistaAvisos.hoy => _paraHoy.length,
-        VistaAvisos.historial => _todos.length,
-        VistaAvisos.importantes => _importantes.length,
-      };
-
-  /* ------------------------------------------------------------ acciones */
-
-  Future<void> _abrirFormulario([Recordatorio? recordatorio]) async {
-    final guardado = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => FormularioRecordatorio(recordatorio: recordatorio),
-      ),
-    );
-
-    if (guardado == true && mounted) await _refrescar();
-  }
-
-  Future<void> _refrescar() async {
-    ref.read(refrescoRecordatoriosProvider.notifier).state++;
-    ref.invalidate(vencidosProvider);
-    await _cargar();
-  }
-
-  Future<void> _cumplir(Recordatorio r) async {
-    final siguiente =
-        await ref.read(recordatoriosRepoProvider).marcarCumplido(r.id!);
     if (!mounted) return;
+    if (recienVencidos > 0) ref.invalidate(vencidosProvider);
 
-    mostrarAviso(
-      context,
-      siguiente == null
-          ? 'Listo, marcado como hecho.'
-          : 'Hecho. El próximo queda para '
-              '${formatoCorto(r.repite!.siguiente(r.fecha))}.',
-    );
-    await _refrescar();
+    setState(() {
+      _todos = items;
+      _cargando = false;
+      // Al resolver el último de la lista elegida, vuelve a elegirse sola.
+      final elegida = _elegida;
+      if (elegida != null && _lista(elegida).isEmpty) _elegida = null;
+    });
   }
 
-  Future<void> _destacar(Recordatorio r) async {
-    await ref
-        .read(recordatoriosRepoProvider)
-        .marcarImportante(r.id!, !r.importante);
-    if (mounted) await _refrescar();
+  List<Recordatorio> _lista(_Vista v) {
+    final hoy = hoyISO();
+    return _todos.where((r) {
+      if (!r.activo) return false;
+      final comparacion = r.fecha.compareTo(hoy);
+      return v == _Vista.vencidos ? comparacion < 0 : comparacion == 0;
+    }).toList();
   }
 
-  Future<void> _eliminar(Recordatorio r) async {
-    final seguro = await confirmar(
-      context,
-      titulo: '¿Eliminar el recordatorio?',
-      mensaje: r.descripcion,
-      aceptar: 'Eliminar',
-      cancelar: 'Permanecer',
-      destructivo: true,
-    );
-    if (!seguro) return;
-
-    await ref.read(recordatoriosRepoProvider).eliminar(r.id!);
-    if (mounted) await _refrescar();
+  List<Recordatorio> get _programados {
+    final hoy = hoyISO();
+    return _todos.where((r) => r.activo && r.fecha.compareTo(hoy) > 0).toList();
   }
 
-  /* ---------------------------------------------------------------- vista */
+  void _abrir(Widget pantalla) =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => pantalla));
 
   @override
   Widget build(BuildContext context) {
     ref.listen(refrescoRecordatoriosProvider, (_, _) => _cargar());
+
+    final vencidos = _lista(_Vista.vencidos);
+    final deHoy = _lista(_Vista.hoy);
+    final vista =
+        _elegida ?? (vencidos.isNotEmpty ? _Vista.vencidos : _Vista.hoy);
+    final visibles = vista == _Vista.vencidos ? vencidos : deHoy;
+    final anio = fechaDe(hoyISO()).year;
 
     return RefreshIndicator(
       color: Tono.vino,
@@ -179,318 +102,220 @@ class _PantallaRecordatoriosState extends ConsumerState<PantallaRecordatorios> {
               Espacio.lg,
               Espacio.lg,
               Espacio.lg,
-              Espacio.lg,
+              Espacio.md,
             ),
             child: Row(
               children: [
-                for (final v in VistaAvisos.values) ...[
-                  Expanded(
-                    child: _Ficha(
-                      vista: v,
-                      cantidad: _cuantos(v),
-                      activa: v == _vista,
-                      onTap: () => setState(() => _vista = v),
+                Expanded(child: Text('Mis avisos', style: Tipo.titulo2)),
+                SizedBox(
+                  width: kAreaTactil,
+                  height: kAreaTactil,
+                  child: Tooltip(
+                    message: 'Nuevo aviso',
+                    child: OutlinedButton(
+                      onPressed: () => nuevoAviso(context, ref),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size.square(kAreaTactil),
+                        foregroundColor: Tono.vino,
+                        shape: const CircleBorder(),
+                      ),
+                      child: const Icon(Icons.add_rounded, size: 24),
                     ),
                   ),
-                  if (v != VistaAvisos.values.last)
-                    const SizedBox(width: Espacio.sm),
-                ],
+                ),
               ],
             ),
           ),
-          if (_cargando)
-            const Padding(
-              padding: EdgeInsets.only(top: Espacio.xxl),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            ..._contenido(),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _contenido() => switch (_vista) {
-        VistaAvisos.hoy => [
-            _seccion(
-              'Pendientes para hoy',
-              _paraHoy,
-              vacio: 'Nada para hoy. Todo al día.',
-            ),
-            _seccion(
-              'Últimos 3 cumplidos',
-              _ultimosCumplidos,
-              vacio: 'Todavía no marcaste ninguno como hecho.',
-            ),
-          ],
-        VistaAvisos.importantes => [
-            _seccion(
-              'Marcados como importantes',
-              _importantes,
-              vacio: 'Toca la estrella de un recordatorio para tenerlo aquí.',
-            ),
-          ],
-        VistaAvisos.historial => [
-            if (_todos.isEmpty)
-              const Contenido(
-                child: EstadoVacio(
-                  icono: Icons.notifications_none_rounded,
-                  titulo: 'No hay nada agendado',
-                  detalle: 'Los mantenimientos también salen solos del paso de '
-                      'Recomendaciones al cerrar un trabajo.',
-                ),
-              )
-            else
-              for (final grupo in _porMes)
-                _bloque(nombreMes(grupo.mes), grupo.items),
-            _NuevoRecordatorio(onTap: _abrirFormulario),
-          ],
-      };
-
-  Widget _seccion(String titulo, List<Recordatorio> items,
-          {required String vacio}) =>
-      items.isEmpty
-          ? Contenido(
-              padding: const EdgeInsets.fromLTRB(
-                Espacio.lg,
-                0,
-                Espacio.lg,
-                Espacio.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(titulo.toUpperCase(), style: Tipo.etiqueta),
-                  const SizedBox(height: Espacio.md),
-                  Panel(
-                    child: Text(vacio, style: Tipo.secundario),
-                  ),
-                  const SizedBox(height: Espacio.md),
-                  _NuevoRecordatorio(onTap: _abrirFormulario),
-                ],
-              ),
-            )
-          : _bloque(titulo, items);
-
-  Widget _bloque(String titulo, List<Recordatorio> items) => Contenido(
-        padding: const EdgeInsets.fromLTRB(
-          Espacio.lg,
-          0,
-          Espacio.lg,
-          Espacio.xl,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(titulo.toUpperCase(), style: Tipo.etiqueta),
-            const SizedBox(height: Espacio.md),
-            ListaAgrupada(
-              filas: [
-                for (final r in items)
-                  _FilaRecordatorio(
-                    recordatorio: r,
-                    onTap: () => _abrirFormulario(r),
-                    onCumplir: () => _cumplir(r),
-                    onDestacar: () => _destacar(r),
-                    onEliminar: () => _eliminar(r),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      );
-}
-
-/// Una de las tres fichas de arriba. Es pestaña y contador a la vez.
-///
-/// Activa = superficie oscura con el número en oro. La diferencia la da el
-/// peso de la superficie, igual que en el resto de la app.
-class _Ficha extends StatelessWidget {
-  const _Ficha({
-    required this.vista,
-    required this.cantidad,
-    required this.activa,
-    required this.onTap,
-  });
-
-  final VistaAvisos vista;
-  final int cantidad;
-  final bool activa;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Pulsable(
-        onTap: onTap,
-        escala: 0.96,
-        semantica: vista.titulo,
-        child: AnimatedContainer(
-          duration: duracion(context, Movimiento.micro),
-          curve: Movimiento.salida,
-          padding: const EdgeInsets.symmetric(
-            horizontal: Espacio.md,
-            vertical: Espacio.md,
-          ),
-          decoration: BoxDecoration(
-            color: activa ? Tono.negro : Tono.fondo,
-            borderRadius: Redondeo.brNormal,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                vista.icono,
-                size: 18,
-                color: activa ? Tono.oroVivo : Tono.texto3,
-              ),
-              const SizedBox(height: Espacio.sm),
-              Text(
-                '$cantidad',
-                style: Tipo.titulo1.copyWith(
-                  fontSize: 24,
-                  color: activa ? Tono.textoInverso : Tono.texto,
-                  fontFeatures: kNumerosTabulares,
-                ),
-              ),
-              Text(
-                vista.titulo,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Tipo.nota.copyWith(
-                  color: activa ? Tono.textoInverso2 : Tono.texto3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-}
-
-/// El alta va acá y no en un botón flotante: la barra de abajo ahora flota, y
-/// un botón flotante encima de otro se tapan entre sí.
-class _NuevoRecordatorio extends StatelessWidget {
-  const _NuevoRecordatorio({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add_alert_rounded, size: 19),
-        label: const Text('Nuevo recordatorio'),
-      );
-}
-
-class _FilaRecordatorio extends StatelessWidget {
-  const _FilaRecordatorio({
-    required this.recordatorio,
-    required this.onTap,
-    required this.onCumplir,
-    required this.onDestacar,
-    required this.onEliminar,
-  });
-
-  final Recordatorio recordatorio;
-  final VoidCallback onTap;
-  final VoidCallback onCumplir;
-  final VoidCallback onDestacar;
-  final VoidCallback onEliminar;
-
-  @override
-  Widget build(BuildContext context) {
-    final r = recordatorio;
-
-    final (etiqueta, color, fondo) = switch (r.estado) {
-      EstadoRecordatorio.vencido => ('Vencido', Tono.vinoTexto, Tono.vinoSuave),
-      EstadoRecordatorio.cumplido => ('Hecho', Tono.oroTexto, Tono.oroSuave),
-      EstadoRecordatorio.pendiente => (
-          formatoCorto(r.fecha),
-          Tono.texto2,
-          Tono.fondo2
-        ),
-    };
-
-    return FilaLista(
-      onTap: r.cumplido ? null : onTap,
-      onLongPress: r.cumplido ? null : onEliminar,
-      padding: const EdgeInsets.fromLTRB(
-        Espacio.lg,
-        Espacio.md,
-        Espacio.sm,
-        Espacio.md,
-      ),
-      child: Row(
-        children: [
-          Expanded(
+          Contenido(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  r.descripcion.trim().isEmpty
-                      ? 'Sin descripción'
-                      : r.descripcion.trim(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Tipo.encabezado,
-                ),
-                const SizedBox(height: Espacio.sm),
-                Wrap(
-                  spacing: Espacio.sm,
-                  runSpacing: Espacio.xs,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                Row(
                   children: [
-                    Insignia(etiqueta, color: color, fondo: fondo),
-                    if (r.seRepite)
-                      Insignia(
-                        r.repite!.corta,
-                        icono: Icons.autorenew_rounded,
+                    Expanded(
+                      child: _Ficha(
+                        titulo: 'Vencidos',
+                        cantidad: vencidos.length,
+                        icono: Icons.error_outline_rounded,
+                        color: vencidos.isEmpty ? Tono.texto2 : Tono.vino,
+                        fondoIcono: vencidos.isEmpty ? Tono.fondo2 : Tono.fondo,
+                        alerta: vencidos.isNotEmpty,
+                        seleccionada: vista == _Vista.vencidos,
+                        onTap: () => setState(() => _elegida = _Vista.vencidos),
+                      ),
+                    ),
+                    const SizedBox(width: Espacio.md),
+                    Expanded(
+                      child: _Ficha(
+                        titulo: 'Hoy',
+                        cantidad: deHoy.length,
+                        icono: Icons.today_rounded,
+                        color: Tono.oro,
+                        fondoIcono: Tono.oroSuave,
+                        seleccionada: vista == _Vista.hoy,
+                        onTap: () => setState(() => _elegida = _Vista.hoy),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Espacio.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Ficha(
+                        titulo: 'Programados',
+                        cantidad: _programados.length,
+                        icono: Icons.event_rounded,
                         color: Tono.texto2,
-                        fondo: Tono.fondo2,
+                        fondoIcono: Tono.fondo2,
+                        abrePantalla: true,
+                        onTap: () => _abrir(const PantallaProgramados()),
                       ),
-                    if ((r.cliente ?? '').trim().isNotEmpty ||
-                        (r.equipo ?? '').trim().isNotEmpty)
-                      Text(
-                        [
-                          if ((r.cliente ?? '').trim().isNotEmpty)
-                            r.cliente!.trim(),
-                          if ((r.equipo ?? '').trim().isNotEmpty)
-                            r.equipo!.trim(),
-                        ].join(' · '),
-                        style: Tipo.nota.copyWith(color: Tono.texto3),
+                    ),
+                    const SizedBox(width: Espacio.md),
+                    Expanded(
+                      child: _Ficha(
+                        titulo: 'Completados',
+                        cantidad: cumplidosDelAnio(_todos, anio),
+                        icono: Icons.check_circle_outline_rounded,
+                        color: Tono.texto2,
+                        fondoIcono: Tono.fondo2,
+                        abrePantalla: true,
+                        onTap: () => _abrir(const PantallaCompletados()),
                       ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-          if (!r.cumplido) ...[
-            IconButton(
-              onPressed: onDestacar,
-              iconSize: 21,
-              visualDensity: VisualDensity.compact,
-              color: r.importante ? Tono.oro : Tono.texto3,
-              tooltip: r.importante ? 'Quitar de importantes' : 'Importante',
-              icon: Icon(
-                r.importante ? Icons.star_rounded : Icons.star_outline_rounded,
+          const SizedBox(height: Espacio.xl),
+          if (_cargando)
+            const Padding(
+              padding: EdgeInsets.only(top: Espacio.xl),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (visibles.isEmpty)
+            Contenido(
+              child: Panel(
+                child: Text(
+                  vista == _Vista.vencidos
+                      ? 'No tienes avisos vencidos.'
+                      : 'Nada para hoy. Todo al día.',
+                  style: Tipo.secundario,
+                ),
               ),
-            ),
-            IconButton(
-              onPressed: onCumplir,
-              iconSize: 23,
-              color: Tono.oro,
-              tooltip: 'Marcar hecho',
-              icon: const Icon(Icons.check_circle_outline_rounded),
-            ),
-          ] else
-            IconButton(
-              onPressed: onEliminar,
-              iconSize: 19,
-              visualDensity: VisualDensity.compact,
-              color: Tono.texto3,
-              tooltip: 'Eliminar',
-              icon: const Icon(Icons.delete_outline_rounded),
-            ),
+            )
+          else
+            for (final r in visibles)
+              Contenido(
+                padding: const EdgeInsets.fromLTRB(
+                  Espacio.lg,
+                  0,
+                  Espacio.lg,
+                  Espacio.md,
+                ),
+                child: TarjetaAviso(
+                  recordatorio: r,
+                  onTap: () => abrirAviso(context, ref, r),
+                  onCumplir: () => cumplirAviso(context, ref, r),
+                ),
+              ),
         ],
       ),
     );
   }
+}
+
+/// Una ficha grande: ícono redondo, número y nombre.
+///
+/// El borde va siempre, transparente cuando no toca, para que el contenido no
+/// salte ni un punto al elegirla.
+class _Ficha extends StatelessWidget {
+  const _Ficha({
+    required this.titulo,
+    required this.cantidad,
+    required this.icono,
+    required this.color,
+    required this.fondoIcono,
+    required this.onTap,
+    this.alerta = false,
+    this.seleccionada = false,
+    this.abrePantalla = false,
+  });
+
+  final String titulo;
+  final int cantidad;
+  final IconData icono;
+  final Color color;
+  final Color fondoIcono;
+  final VoidCallback onTap;
+  final bool alerta;
+  final bool seleccionada;
+  final bool abrePantalla;
+
+  @override
+  Widget build(BuildContext context) => Pulsable(
+    onTap: onTap,
+    escala: 0.97,
+    semantica: '$titulo, $cantidad',
+    child: AnimatedContainer(
+      duration: duracion(context, Movimiento.micro),
+      curve: Movimiento.salida,
+      padding: const EdgeInsets.all(Espacio.lg),
+      decoration: BoxDecoration(
+        color: alerta ? Tono.vinoSuave : Tono.fondo,
+        borderRadius: Redondeo.brNormal,
+        border: Border.all(
+          width: 2,
+          color: seleccionada
+              ? Tono.negro
+              : alerta
+              ? Tono.vinoBorde
+              : Colors.transparent,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: fondoIcono,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icono, size: 23, color: color),
+              ),
+              const Spacer(),
+              if (abrePantalla)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 24,
+                  color: Tono.texto3,
+                ),
+            ],
+          ),
+          const SizedBox(height: Espacio.md),
+          Text(
+            '$cantidad',
+            style: Tipo.titulo1.copyWith(
+              fontSize: 34,
+              height: 1.05,
+              fontFeatures: kNumerosTabulares,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            titulo,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Tipo.encabezado.copyWith(fontSize: 15),
+          ),
+        ],
+      ),
+    ),
+  );
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/tokens.dart';
 import '../../core/utils/dinero.dart';
+import '../../core/utils/validacion.dart';
 import '../../core/widgets/campo.dart';
 import '../../core/widgets/pulsable.dart';
 import '../../domain/entities/linea.dart';
@@ -31,6 +32,7 @@ class AgregarManoDeObra extends StatefulWidget {
 class _AgregarManoDeObraState extends State<AgregarManoDeObra> {
   final _desc = TextEditingController();
   final _precio = TextEditingController();
+  final _dto = TextEditingController();
   final _focoDesc = FocusNode();
 
   bool get _puedeAgregar => _desc.text.trim().isNotEmpty;
@@ -39,6 +41,7 @@ class _AgregarManoDeObraState extends State<AgregarManoDeObra> {
   void dispose() {
     _desc.dispose();
     _precio.dispose();
+    _dto.dispose();
     _focoDesc.dispose();
     super.dispose();
   }
@@ -50,10 +53,12 @@ class _AgregarManoDeObraState extends State<AgregarManoDeObra> {
     widget.onAgregar(LineaMano(
       desc: _desc.text.trim(),
       precio: leerNumero(_precio.text),
+      dto: leerNumero(_dto.text),
     ));
 
     _desc.clear();
     _precio.clear();
+    _dto.clear();
     setState(() {});
     // Vuelve al principio: casi siempre viene otra línea detrás.
     _focoDesc.requestFocus();
@@ -76,15 +81,32 @@ class _AgregarManoDeObraState extends State<AgregarManoDeObra> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
+              flex: 3,
               child: Campo(
                 etiqueta: 'Precio',
                 controlador: _precio,
                 ejemplo: '0.00',
                 teclado: const TextInputType.numberWithOptions(decimal: true),
                 formateadores: [decimalFormato],
+                textoAccion: TextInputAction.next,
+                prefijoTexto: 'S/ ',
+              ),
+            ),
+            const SizedBox(width: Espacio.md),
+            // El descuento de esta línea. Casi siempre queda vacío, y vacío
+            // es cero: por eso va chico al lado del precio y no ocupa un
+            // renglón propio.
+            Expanded(
+              flex: 2,
+              child: Campo(
+                etiqueta: '% Dto.',
+                controlador: _dto,
+                ejemplo: '0',
+                teclado: const TextInputType.numberWithOptions(decimal: true),
+                formateadores: [decimalFormato],
+                validador: Valida.porcentaje(),
                 textoAccion: TextInputAction.done,
                 onEnviar: (_) => _agregar(),
-                prefijoTexto: 'S/ ',
               ),
             ),
             const SizedBox(width: Espacio.md),

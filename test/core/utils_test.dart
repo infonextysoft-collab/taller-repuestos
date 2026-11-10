@@ -33,6 +33,55 @@ void main() {
     });
   });
 
+  group('fechas en palabras', () {
+    const hoy = '2026-11-09';
+    String palabras(String f) => fechaEnPalabras(f, hoy: hoy);
+
+    test('hoy, mañana y ayer', () {
+      expect(palabras('2026-11-09'), 'Hoy · 9 nov');
+      expect(palabras('2026-11-10'), 'Mañana · 10 nov');
+      expect(palabras('2026-11-08'), 'Venció ayer · 8 nov');
+    });
+
+    test('lo vencido y lo que falta', () {
+      expect(palabras('2026-11-06'), 'Venció hace 3 días · 6 nov');
+      expect(palabras('2026-11-30'), 'En 3 semanas · 30 nov');
+      expect(palabras('2026-11-22'), 'En 13 días · 22 nov');
+    });
+
+    test('meses y años', () {
+      expect(palabras('2027-02-20'), 'En 3 meses · 20 feb 2027');
+      expect(palabras('2027-12-01'), 'En 1 año · 1 dic 2027');
+      expect(palabras('2024-11-01'), 'Venció hace 2 años · 1 nov 2024');
+    });
+
+    test('cruza el cambio de mes y de año', () {
+      expect(diasHasta('2027-01-01', hoy: '2026-12-31'), 1);
+      expect(diasHasta('2026-02-28', hoy: '2026-03-01'), -1);
+    });
+  });
+
+  group('codigo de barras', () {
+    test('ignora mayúsculas y espacios', () {
+      expect(codigoParaComparar(' abc-77 '), 'ABC-77');
+    });
+
+    test('el 0 de adelante de un EAN-13 no cuenta', () {
+      expect(
+        codigoParaComparar('0036000291452'),
+        codigoParaComparar('036000291452'),
+      );
+    });
+
+    test('un EAN-13 que no empieza con 0 queda igual', () {
+      expect(codigoParaComparar('7501234567893'), '7501234567893');
+    });
+
+    test('un código corto con cero adelante no se toca', () {
+      expect(codigoParaComparar('0123'), '0123');
+    });
+  });
+
   group('documento', () {
     test('RUCs reales pasan', () {
       // Verificados contra RUCs que existen.

@@ -43,6 +43,9 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
   List<Repuesto> _inventario = const [];
   bool _guardando = false;
 
+  /// El repuesto al que ya le pertenece el código escrito.
+  Repuesto? _codigoDe;
+
   bool get _esEdicion => widget.repuesto != null;
 
   @override
@@ -112,12 +115,60 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
     return null;
   }
 
+  /// El otro repuesto que ya tiene ese código, si lo hay.
+  Future<Repuesto?> _otroConCodigo(String codigo) async {
+    final dueno = await ref.read(inventarioRepoProvider).buscarPorCodigo(codigo);
+    return dueno == null || dueno.id == widget.repuesto?.id ? null : dueno;
+  }
+
+  /// Se revisa mientras se escribe y no recién al guardar: enterarse al final,
+  /// con todo el formulario lleno, es tarde.
+  Future<void> _revisarCodigo() async {
+    final escrito = _codigo.text;
+    final otro = await _otroConCodigo(escrito);
+
+    // Mientras se buscaba pudo seguir escribiendo: esa respuesta ya no vale.
+    if (!mounted || _codigo.text != escrito) return;
+    setState(() => _codigoDe = otro);
+  }
+
   Future<void> _escanear() async {
     final codigo = await escanearCodigo(context);
-    if (codigo != null && mounted) {
-      setState(() => _codigo.text = codigo);
-      _form.currentState?.validate();
+    if (codigo == null || !mounted) return;
+
+    final otro = await _otroConCodigo(codigo);
+    if (!mounted) return;
+
+    if (otro != null) {
+      // No se pone en el campo: un código ajeno ahí solo estorba.
+      final ver = await confirmar(
+        context,
+        titulo: 'Este código ya es de ${otro.nombre.toUpperCase()}',
+        mensaje: 'Cada código es de un solo repuesto. Revisa que hayas '
+            'escaneado la etiqueta correcta.',
+        aceptar: 'Ver ese repuesto',
+      );
+      if (ver && mounted) await _verOtro(otro);
+      return;
     }
+
+    setState(() {
+      _codigo.text = codigo;
+      _codigoDe = null;
+    });
+    _form.currentState?.validate();
+  }
+
+  /// Se abre encima para no perder lo que ya se escribió en este formulario.
+  Future<void> _verOtro(Repuesto otro) async {
+    final cambio = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => FormularioRepuesto(repuesto: otro)),
+    );
+    if (!mounted) return;
+
+    if (cambio == true) ref.read(refrescoInventarioProvider.notifier).state++;
+    await _cargarInventario();
+    await _revisarCodigo();
   }
 
   Future<void> _sumarAlExistente(Repuesto existente) async {
@@ -152,7 +203,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
     if (codigo.isNotEmpty &&
         await repo.codigoRepetido(codigo, exceptoId: widget.repuesto?.id)) {
       if (mounted) {
-        mostrarAviso(context, 'Ese código ya lo usa otro repuesto.',
+        mostrarAviso(context, 'Ese código ya es de otro repuesto.',
             problema: true);
       }
       return;
@@ -290,7 +341,7 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
                     validador: (valor) => codigoBarrasValido(valor)
                         ? null
                         : 'Ese código no cierra: revisa los dígitos.',
-                    onCambio: (_) => setState(() {}),
+                    onCambio: (_) => _revisarCodigo(),
                     sufijo: IconButton(
                       onPressed: _escanear,
                       tooltip: 'Escanear',
@@ -298,6 +349,14 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
                           size: 22, color: Tono.vino),
                     ),
                   ),
+                  if (_codigoDe != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: Espacio.md),
+                      child: _AvisoCodigo(
+                        dueno: _codigoDe!,
+                        onVer: () => _verOtro(_codigoDe!),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -306,11 +365,45 @@ class _FormularioRepuestoState extends ConsumerState<FormularioRepuesto> {
       ),
       bottomNavigationBar: BarraAccion(
         texto: _esEdicion ? 'Guardar cambios' : 'Agregar al inventario',
-        habilitado: !_guardando && _duplicado == null,
+        habilitado: !_guardando && _duplicado == null && _codigoDe == null,
         onTap: _guardar,
       ),
     );
   }
+}
+
+/// El código escrito ya es de otro repuesto.
+class _AvisoCodigo extends StatelessWidget {
+  const _AvisoCodigo({required this.dueno, required this.onVer});
+
+  final Repuesto dueno;
+  final VoidCallback onVer;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(Espacio.lg),
+        decoration: const BoxDecoration(
+          color: Tono.vinoSuave,
+          borderRadius: Redondeo.brChico,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Este código ya es de ${dueno.nombre.toUpperCase()}',
+              style: Tipo.cuerpo.copyWith(
+                color: Tono.vino,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: Espacio.md),
+            OutlinedButton(
+              onPressed: onVer,
+              child: const Text('Ver ese repuesto'),
+            ),
+          ],
+        ),
+      );
 }
 
 class _AvisoDuplicado extends StatelessWidget {

@@ -95,7 +95,10 @@ class AppDatabase {
   ///
   /// 7 → 8: el trabajo guarda placa, año, número de motor y VIN, y el
   /// repuesto de quién se compra.
-  static const int _version = 8;
+  ///
+  /// 8 → 9: el aviso guarda qué día se cumplió y qué día se eliminó. Eliminar
+  /// ya no borra la fila: se queda en el historial.
+  static const int _version = 9;
 
   @visibleForTesting
   static int get version => _version;
@@ -180,6 +183,11 @@ class AppDatabase {
       await _agregarColumna(d, 'trabajos', 'nMotor', vacia);
       await _agregarColumna(d, 'trabajos', 'vin', vacia);
       await _agregarColumna(d, 'inventario', 'proveedor', vacia);
+    }
+
+    if (desde < 9) {
+      await _agregarColumna(d, 'recordatorios', 'cumplidoEl', 'TEXT');
+      await _agregarColumna(d, 'recordatorios', 'eliminadoEl', 'TEXT');
     }
   }
 
@@ -404,7 +412,9 @@ class AppDatabase {
         importante   INTEGER NOT NULL DEFAULT 0,
         trabajoId    INTEGER,
         cliente      TEXT,
-        equipo       TEXT
+        equipo       TEXT,
+        cumplidoEl   TEXT,
+        eliminadoEl  TEXT
       )
     ''',
     'CREATE INDEX ix_rec_fecha   ON recordatorios(fecha)',

@@ -9,6 +9,16 @@
 /// mundo real no tiene.
 library;
 
+/// La forma de un código para compararlo con otro.
+///
+/// Ignora mayúsculas y el cero de adelante de un EAN-13: un mismo producto
+/// sale como UPC-A de 12 dígitos en un lector y como EAN-13 con un 0 delante
+/// en otro, y son el mismo código.
+String codigoParaComparar(String codigo) {
+  final c = codigo.trim().toUpperCase();
+  return RegExp(r'^0\d{12}$').hasMatch(c) ? c.substring(1) : c;
+}
+
 /// ¿El código es numérico de largo verificable?
 bool esCodigoVerificable(String codigo) =>
     RegExp(r'^\d+$').hasMatch(codigo) &&

@@ -101,8 +101,6 @@ class _PantallaRespaldoState extends ConsumerState<PantallaRespaldo> {
       titulo: '¿Restaurar este respaldo?',
       mensaje: 'Se reemplaza todo lo que hay en este teléfono por lo que traiga '
           'el archivo. Lo que cargaste después del respaldo se pierde.',
-      aceptar: 'Restaurar',
-      cancelar: 'Permanecer',
       destructivo: true,
     );
     if (!seguro || !mounted) return;

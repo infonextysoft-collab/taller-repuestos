@@ -88,8 +88,12 @@ class _Fila extends StatelessWidget {
     // La segunda línea solo existe si tiene algo que decir. En mano de obra no
     // hay cantidad ni precio unitario que agregar —el importe **es** el
     // precio—, así que repetirlo abajo era decir dos veces lo mismo.
-    final hayDetalle =
-        onCambiarCantidad != null || mostrarCantidad || (mostrarOrigen && externo);
+    final rebajada = linea.dtoValido > 0;
+
+    final hayDetalle = onCambiarCantidad != null ||
+        mostrarCantidad ||
+        rebajada ||
+        (mostrarOrigen && externo);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -154,6 +158,16 @@ class _Fila extends StatelessWidget {
                             style: Tipo.montoChico,
                           ),
                         ),
+                      // La rebaja se ve en la línea, no solo en el total: si
+                      // el importe bajó, tiene que decir por qué.
+                      if (rebajada) ...[
+                        const SizedBox(width: Espacio.sm),
+                        Insignia(
+                          '−${_sinCola(linea.dtoValido)} %',
+                          color: Tono.vinoTexto,
+                          fondo: Tono.vinoSuave,
+                        ),
+                      ],
                       if (mostrarOrigen && externo) ...[
                         const SizedBox(width: Espacio.sm),
                         const Insignia(
@@ -185,6 +199,10 @@ class _Fila extends StatelessWidget {
     );
   }
 }
+
+/// `10.0` → `10`, `7.5` → `7.5`. Un descuento redondo no necesita decimales.
+String _sinCola(double n) =>
+    n == n.roundToDouble() ? n.toStringAsFixed(0) : n.toStringAsFixed(1);
 
 class _PasoCantidad extends StatelessWidget {
   const _PasoCantidad({required this.icono, required this.onTap});

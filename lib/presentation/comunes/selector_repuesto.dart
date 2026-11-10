@@ -132,7 +132,14 @@ class _SelectorRepuestoState extends ConsumerState<SelectorRepuesto> {
       costo: datos.costo,
     );
 
-    widget.onAgregar(resultado.lineas, resultado.aviso);
+    // El descuento se pone acá y no en el inventario: es de esta venta, no
+    // del repuesto. Si la línea se partió en dos —inventario y externo—, la
+    // rebaja acordada vale para las dos mitades.
+    final lineas = datos.dto > 0
+        ? [for (final l in resultado.lineas) l.copyWith(dto: datos.dto)]
+        : resultado.lineas;
+
+    widget.onAgregar(lineas, resultado.aviso);
     _busqueda.clear();
     await _cargar();
   }
@@ -297,7 +304,7 @@ class _FilaRepuesto extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.nombre,
+                    item.nombre.toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Tipo.encabezado,
@@ -348,10 +355,13 @@ class _FilaRepuesto extends StatelessWidget {
 
 /// Cantidad y precio de una línea, para el caso que se sale de lo normal.
 class _DetalleLinea {
-  const _DetalleLinea(this.cantidad, this.precio, this.costo);
+  const _DetalleLinea(this.cantidad, this.precio, this.costo, this.dto);
 
   final int cantidad;
   final double precio;
+
+  /// Lo que se le rebaja a esta línea, en porcentaje.
+  final double dto;
 
   /// Lo que costó conseguirlo. Solo se pregunta en los externos: los del
   /// inventario ya lo saben.
@@ -388,12 +398,14 @@ class _FormularioDetalleState extends State<_FormularioDetalle> {
         : '',
   );
   final _costo = TextEditingController();
+  final _dto = TextEditingController();
   int _cantidad = 1;
 
   @override
   void dispose() {
     _precio.dispose();
     _costo.dispose();
+    _dto.dispose();
     super.dispose();
   }
 
@@ -405,6 +417,7 @@ class _FormularioDetalleState extends State<_FormularioDetalle> {
       _cantidad,
       leerNumero(_precio.text),
       costo > 0 ? costo : null,
+      leerNumero(_dto.text),
     ));
   }
 
@@ -445,13 +458,35 @@ class _FormularioDetalleState extends State<_FormularioDetalle> {
                 ],
               ),
               const SizedBox(height: Espacio.xl),
-              Campo(
-                etiqueta: 'Precio unitario',
-                controlador: _precio,
-                ejemplo: '0.00',
-                teclado: const TextInputType.numberWithOptions(decimal: true),
-                formateadores: [decimalFormato],
-                validador: Valida.precio(obligatorio: widget.externo),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Campo(
+                      etiqueta: 'Precio unitario',
+                      controlador: _precio,
+                      ejemplo: '0.00',
+                      teclado:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      formateadores: [decimalFormato],
+                      validador: Valida.precio(obligatorio: widget.externo),
+                    ),
+                  ),
+                  const SizedBox(width: Espacio.md),
+                  Expanded(
+                    flex: 2,
+                    child: Campo(
+                      etiqueta: '% Dto.',
+                      controlador: _dto,
+                      ejemplo: '0',
+                      teclado:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      formateadores: [decimalFormato],
+                      validador: Valida.porcentaje(),
+                    ),
+                  ),
+                ],
               ),
               if (widget.externo) ...[
                 const SizedBox(height: Espacio.lg),

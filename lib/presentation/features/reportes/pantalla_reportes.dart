@@ -5,14 +5,11 @@ import '../../../app/providers.dart';
 import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/dinero.dart';
-import '../../../core/utils/fechas.dart';
 import '../../../core/widgets/contenido.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../../domain/services/estadisticas.dart';
 import '../../../domain/services/ganancia.dart';
-import '../../comunes/filtro_chips.dart';
-
-enum _Periodo { mes, anio, todo }
+import 'filtro_reportes.dart';
 
 /// Los números del taller: cuánto entró, cuánto costó y qué se vende más.
 ///
@@ -28,7 +25,7 @@ class PantallaReportes extends ConsumerStatefulWidget {
 }
 
 class _PantallaReportesState extends ConsumerState<PantallaReportes> {
-  _Periodo _periodo = _Periodo.mes;
+  FiltroReporte _filtro = const FiltroReporte();
   List<Trabajo> _trabajos = const [];
   bool _cargando = true;
 
@@ -49,25 +46,25 @@ class _PantallaReportesState extends ConsumerState<PantallaReportes> {
     }
   }
 
-  bool _entra(String fecha) => switch (_periodo) {
-        _Periodo.mes => fecha.startsWith(claveMes(hoyISO())),
-        _Periodo.anio => fecha.startsWith(hoyISO().substring(0, 4)),
-        _Periodo.todo => true,
-      };
-
   /// Solo los trabajos cerrados: uno a medias todavía no es plata.
-  List<Trabajo> get _cerrados =>
-      _trabajos.where((t) => t.estaTerminado && _entra(t.fecha)).toList();
+  List<Trabajo> get _cerrados => _trabajos
+      .where((t) => t.estaTerminado && _filtro.entra(t.fecha))
+      .toList();
 
   @override
   Widget build(BuildContext context) {
     final cerrados = _cerrados;
 
+    var mano = 0.0;
+    var repuestos = 0.0;
     var cobrado = 0.0;
     var costo = 0.0;
     var sinCosto = 0;
+
     for (final t in cerrados) {
       final g = gananciaDe(t);
+      mano += g.netaMano;
+      repuestos += g.netaRepuestos;
       cobrado += g.cobrado;
       costo += g.costo;
       sinCosto += g.sinCosto;
@@ -85,14 +82,9 @@ class _PantallaReportesState extends ConsumerState<PantallaReportes> {
           children: [
             Contenido(
               ancho: Ancho.acciones,
-              child: FiltroChips<_Periodo>(
-                valor: _periodo,
-                opciones: const [
-                  OpcionChip(_Periodo.mes, 'Este mes'),
-                  OpcionChip(_Periodo.anio, 'Este año'),
-                  OpcionChip(_Periodo.todo, 'Todo'),
-                ],
-                onCambio: (p) => setState(() => _periodo = p),
+              child: BotonFiltroReporte(
+                filtro: _filtro,
+                onCambio: (f) => setState(() => _filtro = f),
               ),
             ),
             const SizedBox(height: Espacio.lg),
@@ -109,6 +101,44 @@ class _PantallaReportesState extends ConsumerState<PantallaReportes> {
                   cobrado: redondear(cobrado),
                   costo: redondear(costo),
                   sinCosto: sinCosto,
+                ),
+              ),
+              const SizedBox(height: Espacio.md),
+              // De dónde salió esa ganancia: de tu tiempo o de tus piezas.
+              // Son dos negocios distintos metidos en el mismo taller, y
+              // sumados en un solo número no se sabe cuál está andando.
+              Contenido(
+                ancho: Ancho.acciones,
+                // Las dos del mismo alto aunque una tenga una línea más de
+                // texto: dos tarjetas desparejas lado a lado se leen como si
+                // una importara más que la otra.
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _Mitad(
+                          titulo: 'MANO DE OBRA',
+                          icono: Icons.handyman_rounded,
+                          monto: redondear(mano),
+                          detalle: 'Lo que cobras por trabajar no tiene costo '
+                              'de repuestos.',
+                        ),
+                      ),
+                      const SizedBox(width: Espacio.md),
+                      Expanded(
+                        child: _Mitad(
+                          titulo: 'INVENTARIO',
+                          icono: Icons.inventory_2_rounded,
+                          monto: redondear(repuestos),
+                          detalle: sinCosto > 0
+                              ? 'Es un techo: faltan costos.'
+                              : 'Lo vendido menos lo que costó reponerlo.',
+                          incompleto: sinCosto > 0,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: Espacio.xl),
@@ -200,6 +230,66 @@ class _Plata extends StatelessWidget {
   }
 }
 
+/// Una de las dos mitades de la ganancia.
+class _Mitad extends StatelessWidget {
+  const _Mitad({
+    required this.titulo,
+    required this.icono,
+    required this.monto,
+    required this.detalle,
+    this.incompleto = false,
+  });
+
+  final String titulo;
+  final IconData icono;
+  final double monto;
+  final String detalle;
+  final bool incompleto;
+
+  @override
+  Widget build(BuildContext context) => Panel(
+        color: Tono.fondo2,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icono, size: 16, color: Tono.texto3),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    titulo,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Tipo.etiqueta,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Espacio.sm),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                soles(monto),
+                style: Tipo.display.copyWith(
+                  fontSize: 23,
+                  color: monto < 0 ? Tono.vino : Tono.oroTexto,
+                ),
+              ),
+            ),
+            const SizedBox(height: Espacio.xs),
+            Text(
+              detalle,
+              style: Tipo.nota.copyWith(
+                color: incompleto ? Tono.vinoTexto : Tono.texto3,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 class _Dato extends StatelessWidget {
   const _Dato(this.etiqueta, this.valor);
 
@@ -236,7 +326,7 @@ class _FilaVendido extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  v.nombre,
+                  v.nombre.toUpperCase(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Tipo.encabezado,
@@ -255,7 +345,7 @@ class _FilaVendido extends StatelessWidget {
               Text(soles(v.cobrado), style: Tipo.monto),
               const SizedBox(height: 3),
               Text(
-                v.completa ? 'deja ${soles(v.ganancia)}' : 'sin costo',
+                v.completa ? 'gana ${soles(v.ganancia)}' : 'sin costo',
                 style: Tipo.nota.copyWith(
                   color: v.completa ? Tono.oroTexto : Tono.texto3,
                 ),

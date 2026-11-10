@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taller_repuestos/app/providers.dart';
 import 'package:taller_repuestos/core/utils/clave_segura.dart';
+import 'package:taller_repuestos/core/utils/fechas.dart';
 import 'package:taller_repuestos/core/theme/app_theme.dart';
 import 'package:taller_repuestos/core/theme/tokens.dart';
 import 'package:taller_repuestos/data/local/app_database.dart';
@@ -25,12 +26,17 @@ import 'package:taller_repuestos/domain/entities/recordatorio.dart';
 import 'package:taller_repuestos/domain/entities/repeticion.dart';
 import 'package:taller_repuestos/domain/entities/repuesto.dart';
 import 'package:taller_repuestos/domain/entities/trabajo.dart';
+import 'package:taller_repuestos/domain/services/calculadora_totales.dart';
+import 'package:taller_repuestos/presentation/comunes/elegir_documentos.dart';
 import 'package:taller_repuestos/presentation/features/apertura/pantalla_apertura.dart';
 import 'package:taller_repuestos/presentation/features/auth/pantalla_login.dart';
 import 'package:taller_repuestos/presentation/features/inventario/formulario_repuesto.dart';
+import 'package:taller_repuestos/presentation/features/inventario/pantalla_actualizar_stock.dart';
 import 'package:taller_repuestos/presentation/features/reportes/pantalla_reportes.dart';
 import 'package:taller_repuestos/presentation/features/negocio/pantalla_negocio.dart';
 import 'package:taller_repuestos/presentation/features/negocio/pantalla_respaldo.dart';
+import 'package:taller_repuestos/presentation/features/recordatorios/pantalla_completados.dart';
+import 'package:taller_repuestos/presentation/features/recordatorios/pantalla_programados.dart';
 import 'package:taller_repuestos/presentation/features/shell/shell_principal.dart';
 import 'package:taller_repuestos/presentation/features/trabajo/wizard_trabajo.dart';
 
@@ -271,6 +277,93 @@ void main() {
     );
   });
 
+  testWidgets('avisos: programados', (tester) async {
+    await _mostrar(tester, const PantallaProgramados());
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/23-avisos-programados.png'),
+    );
+  });
+
+  testWidgets('avisos: completados por mes', (tester) async {
+    await _mostrar(tester, const PantallaCompletados());
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/24-avisos-completados.png'),
+    );
+  });
+
+  testWidgets('avisos: la ventana de un mes', (tester) async {
+    await _mostrar(tester, const PantallaCompletados());
+    await tester.tap(find.text('Octubre'));
+    await _asentar(tester);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/25-avisos-mes.png'),
+    );
+  });
+
+  testWidgets('avisos: el detalle y eliminar uno que se repite', (tester) async {
+    await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
+    await tester.tap(find.byIcon(Icons.notifications_rounded).first);
+    await _asentar(tester);
+
+    await tester.tap(find.textContaining('Cambiar filtro').first);
+    await _asentar(tester);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/26-avisos-detalle.png'),
+    );
+
+    await tester.tap(find.text('Eliminar'));
+    await _asentar(tester);
+    await tester.tap(find.text('Eliminar solo este'));
+    await _asentar(tester);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/27-avisos-eliminar.png'),
+    );
+  });
+
+  testWidgets('compartir: elegir qué papeles van', (tester) async {
+    const trabajo = Trabajo(
+      codigo: 'REP-2026-0002',
+      tipo: TipoTrabajo.taller,
+      estado: EstadoTrabajo.terminado,
+      fecha: '2026-09-13',
+      vistaDoc: VistaDoc.separado,
+      trabajosRealizados: [LineaMano(desc: 'Lavado', precio: 40)],
+      repuestos: [LineaRepuesto(desc: 'Foco', cantidad: 1, precio: 50)],
+    );
+
+    await _mostrar(
+      tester,
+      Scaffold(
+        body: Builder(
+          builder: (context) => Center(
+            child: TextButton(
+              onPressed: () => elegirDocumentos(
+                context,
+                trabajo,
+                calculadora.calcularBoletas(trabajo),
+                compartir: true,
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('abrir'));
+    await _asentar(tester);
+    await tester.tap(find.text('Reporte de trabajo'));
+    await _asentar(tester);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/28-compartir-casillas.png'),
+    );
+  });
+
   testWidgets('formulario de repuesto: los dos precios y lo que deja',
       (tester) async {
     final item = await tester.runAsync(
@@ -290,7 +383,7 @@ void main() {
     await _mostrar(tester, ShellPrincipal(alSalir: () async {}));
     await tester.tap(find.byIcon(Icons.inventory_2_rounded).first);
     await _asentar(tester);
-    await tester.tap(find.text('Filtro de aceite'));
+    await tester.tap(find.text('FILTRO DE ACEITE'));
     await _esperarA(tester, find.text('Vendidos'));
     await tester.pump(const Duration(milliseconds: 700));
     expect(find.text('Se lo compras a'), findsOneWidget);
@@ -304,12 +397,25 @@ void main() {
     await _mostrar(tester, const PantallaReportes());
     await _esperarA(tester, find.text('LO QUE MÁS SALE'));
     // "Todo" y no "Este mes": una captura que se vacía al cambiar de mes no
-    // sirve para comparar nada.
+    // sirve para comparar nada. Ahora se elige desde el filtro.
+    await tester.tap(find.byType(OutlinedButton).first);
+    await _asentar(tester);
     await tester.tap(find.text('Todo'));
     await _asentar(tester);
     await expectLater(
       find.byType(MaterialApp),
       matchesGoldenFile('capturas/21-reportes.png'),
+    );
+  });
+
+  testWidgets('actualizar stock', (tester) async {
+    await _mostrar(tester, const PantallaActualizarStock());
+    await _esperarA(tester, find.text('FILTRO DE ACEITE'));
+    await tester.tap(find.byIcon(Icons.add_rounded).first);
+    await _asentar(tester);
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('capturas/22-actualizar-stock.png'),
     );
   });
 
@@ -569,6 +675,37 @@ Future<void> _sembrar(AppDatabase db) async {
     repite: Repeticion(15, UnidadRepeticion.dias),
     cliente: 'Luis Paredes',
   ));
+  await recordatorios.crear(Recordatorio(
+    descripcion: 'Entregar la bomba reparada',
+    fecha: hoyISO(),
+    cliente: 'Luis Paredes',
+    equipo: 'Bomba de agua',
+  ));
+
+  // El historial: octubre con algo de cada cosa, y un año anterior para que
+  // aparezca el selector de año.
+  Future<int> pasado(String texto, String fecha, {String? cliente}) =>
+      recordatorios.crear(
+        Recordatorio(descripcion: texto, fecha: fecha, cliente: cliente),
+      );
+
+  await recordatorios.marcarCumplido(
+    await pasado('Cambio de aceite', '2026-10-12', cliente: 'Juan Ramírez'),
+  );
+  await recordatorios.marcarCumplido(
+    await pasado('Revisar correas', '2026-10-20', cliente: 'Minera Eco Pampa'),
+  );
+  await pasado('Ajustar frenos', '2026-10-25', cliente: 'Luis Paredes');
+  await recordatorios.eliminar(
+    await pasado('Limpiar radiador', '2026-10-28', cliente: 'Luis Paredes'),
+  );
+  await recordatorios.marcarCumplido(
+    await pasado('Cambio de batería', '2026-03-03', cliente: 'Juan Ramírez'),
+  );
+  await recordatorios.marcarCumplido(
+    await pasado('Inspección anual', '2025-06-15', cliente: 'Minera Eco Pampa'),
+  );
+
   await recordatorios.refrescarVencidos();
 }
 

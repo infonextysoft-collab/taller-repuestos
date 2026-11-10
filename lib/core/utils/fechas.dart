@@ -80,3 +80,55 @@ String nombreMes(String claveDeMes) {
 /// Clave de agrupación por mes: `"2026-08-25"` → `"2026-08"`
 String claveMes(String fechaISO) =>
     fechaISO.length >= 7 ? fechaISO.substring(0, 7) : fechaISO;
+
+const List<String> _mesesCortos = [
+  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+];
+
+/// `"2026-11-06"` → `"6 nov"`. Si es de otro año, lo dice: `"6 nov 2025"`.
+String diaMes(String fechaISO, {String? hoy}) {
+  final p = fechaISO.split('-');
+  if (p.length != 3) return fechaISO;
+
+  final m = int.tryParse(p[1]) ?? 1;
+  final d = int.tryParse(p[2]) ?? 1;
+  final texto = '$d ${_mesesCortos[m - 1]}';
+
+  return p[0] == (hoy ?? hoyISO()).split('-').first ? texto : '$texto ${p[0]}';
+}
+
+/// Días que faltan para esa fecha: negativo si ya pasó, `0` si es hoy.
+///
+/// En UTC a propósito: un día de 23 horas por cambio de horario restaría mal.
+int diasHasta(String fechaISO, {String? hoy}) {
+  DateTime utc(String iso) {
+    final f = fechaDe(iso);
+    return DateTime.utc(f.year, f.month, f.day);
+  }
+
+  return utc(fechaISO).difference(utc(hoy ?? hoyISO())).inDays;
+}
+
+String _cuantoFalta(int dias) {
+  if (dias < 14) return dias == 1 ? '1 día' : '$dias días';
+  if (dias < 60) return '${dias ~/ 7} semanas';
+  if (dias < 365) return '${dias ~/ 30} meses';
+  return dias < 730 ? '1 año' : '${dias ~/ 365} años';
+}
+
+/// La fecha de un aviso como se diría en voz alta:
+/// `"Venció hace 3 días · 6 nov"`, `"Hoy · 9 nov"`, `"En 3 semanas · 30 nov"`.
+String fechaEnPalabras(String fechaISO, {String? hoy}) {
+  final d = diasHasta(fechaISO, hoy: hoy);
+
+  final cuando = switch (d) {
+    0 => 'Hoy',
+    1 => 'Mañana',
+    -1 => 'Venció ayer',
+    < 0 => 'Venció hace ${_cuantoFalta(-d)}',
+    _ => 'En ${_cuantoFalta(d)}',
+  };
+
+  return '$cuando · ${diaMes(fechaISO, hoy: hoy)}';
+}

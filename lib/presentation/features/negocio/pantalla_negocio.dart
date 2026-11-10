@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/config/negocio_fijo.dart';
 import '../../../core/utils/validacion.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/campo.dart';
@@ -11,6 +12,7 @@ import '../../../core/widgets/campo_documento.dart';
 import '../../../core/widgets/contenido.dart';
 import '../../../domain/entities/negocio.dart';
 import '../../comunes/barra_accion.dart';
+import 'selector_banco.dart';
 
 /// Los datos del emisor: lo que sale impreso en la cabecera de cada documento.
 ///
@@ -223,8 +225,16 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
                     etiqueta: 'RUC',
                     soloRuc: true,
                     obligatorio: true,
+                    habilitado: kRucFijo.isEmpty,
                     onCambio: (_) => setState(() => _hayCambios = true),
                   ),
+                  if (kRucFijo.isNotEmpty) ...[
+                    const SizedBox(height: Espacio.xs),
+                    Text(
+                      'El RUC viene fijo en la app y no se puede cambiar.',
+                      style: Tipo.nota,
+                    ),
+                  ],
                   const SizedBox(height: Espacio.lg),
                   Campo(
                     etiqueta: 'Dirección',
@@ -264,19 +274,15 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
                   Text('PARA COBRAR', style: Tipo.etiqueta),
                   const SizedBox(height: Espacio.sm),
                   Text(
-                    'Sale al pie de la boleta y se copia al compartirla, para '
+                    'Sale al pie de la nota de venta y se copia al compartirla, para '
                     'no tener que buscar el número cada vez. Lo que dejes '
                     'vacío no se imprime.',
                     style: Tipo.secundario,
                   ),
                   const SizedBox(height: Espacio.lg),
-                  Campo(
-                    etiqueta: 'Banco',
+                  SelectorBanco(
                     controlador: _banco,
-                    ejemplo: 'BCP, Interbank, BBVA…',
-                    opcional: true,
-                    textoAccion: TextInputAction.next,
-                    onCambio: (_) => setState(() => _hayCambios = true),
+                    onCambio: () => setState(() => _hayCambios = true),
                   ),
                   const SizedBox(height: Espacio.lg),
                   Campo(

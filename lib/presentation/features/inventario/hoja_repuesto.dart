@@ -27,7 +27,7 @@ Future<AccionRepuesto?> mostrarFichaRepuesto(
 ) =>
     mostrarHoja<AccionRepuesto>(
       context,
-      titulo: repuesto.nombre,
+      titulo: repuesto.nombre.toUpperCase(),
       bajada: repuesto.agotado
           ? 'Agotado'
           : '${repuesto.stock} en stock · ${soles(repuesto.precio)}',
@@ -140,7 +140,7 @@ class _Numeros extends StatelessWidget {
           ),
           if (gana != null)
             _Fila(
-              'Deja por unidad',
+              'Gana por unidad',
               '${soles(gana)}'
               '${r.margen == null ? '' : ' (${r.margen!.round()} %)'}',
               enOro: gana >= 0,
@@ -158,7 +158,7 @@ class _Numeros extends StatelessWidget {
               v.unidades == 1 ? '1 unidad' : '${v.unidades} unidades',
             ),
             _Fila(
-              v.completa ? 'Dejaron' : 'Dejaron, como mucho',
+              v.completa ? 'Ganancia' : 'Ganancia, como mucho',
               soles(v.ganancia),
               enOro: v.ganancia >= 0,
             ),

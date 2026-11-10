@@ -88,8 +88,6 @@ class _PantallaVentaSimpleState extends ConsumerState<PantallaVentaSimple> {
       context,
       titulo: '¿Descartar la venta?',
       mensaje: 'Los repuestos que agregaste vuelven al inventario.',
-      aceptar: 'Descartar',
-      cancelar: 'Permanecer',
       destructivo: true,
     );
 
@@ -230,14 +228,15 @@ class _PantallaVentaSimpleState extends ConsumerState<PantallaVentaSimple> {
                           Seccion(
                             titulo: 'Cierre',
                             child: Campo(
-                              etiqueta: 'Descuento',
+                              etiqueta: 'Descuento del total',
                               controlador: _descuento,
                               ejemplo: '0.00',
                               opcional: true,
                               teclado: const TextInputType.numberWithOptions(
                                   decimal: true),
                               formateadores: [decimalFormato],
-                              ayuda: 'Se resta del total, antes del IGV.',
+                              ayuda: 'En soles, sobre toda la venta. Para '
+                                  'rebajar un repuesto está su % Dto.',
                               validador: Valida.descuento(
                                 () => _ctrl.totales.subtotal,
                               ),

@@ -23,10 +23,15 @@ final NumberFormat _numero = NumberFormat('#,##0.00', 'en_US');
 ///
 /// El signo va **antes** del símbolo (`-S/ 60.00`): es como se lee un
 /// descuento en una boleta.
-String soles(num? n) {
+///
+/// Con `simbolo: false` sale el número pelado, para las columnas de la boleta:
+/// ahí el `S/` ya está en el encabezado y repetirlo en cada renglón solo
+/// ensucia la columna.
+String soles(num? n, {bool simbolo = true}) {
   final valor = (n ?? 0).toDouble();
   final signo = valor < 0 ? '-' : '';
-  return '$signo$_simbolo${_numero.format(valor.abs())}';
+  final marca = simbolo ? _simbolo : '';
+  return '$signo$marca${_numero.format(valor.abs())}';
 }
 
 /// Lee un número escrito a mano: acepta coma o punto decimal y descarta el

@@ -315,6 +315,26 @@ void main() {
     expect(viejo.nMotor, '');
     expect(viejo.vin, '');
   });
+
+  test('un aviso viejo sigue igual y estrena sus fechas vacías', () async {
+    final ruta = await baseVieja(_esquemaWeb, (d) async {
+      await d.insert('recordatorios', {
+        'descripcion': 'Cambio de aceite',
+        'fecha': '2026-01-10',
+        'estado': 'cumplido',
+      });
+      await d.insert('auth', {'id': 1, 'usuario': 'Samuel', 'clave': 'Clave99'});
+    });
+
+    final base = await AppDatabase.abrirEn(databaseFactoryFfi, ruta);
+    addTearDown(base.cerrar);
+
+    final viejo = (await RecordatoriosRepositorySqlite(base).listar()).single;
+
+    expect(viejo.cumplido, isTrue);
+    expect(viejo.cumplidoEl, isNull);
+    expect(viejo.eliminadoEl, isNull);
+  });
 }
 
 /// El esquema tal como lo creaba la app publicada en la vista web (commit

@@ -22,10 +22,18 @@ class RecordatoriosRepositorySqlite implements RecordatoriosRepository {
   }
 
   @override
-  Future<List<Recordatorio>> listar({bool incluirCumplidos = true}) async {
+  Future<List<Recordatorio>> listar({
+    bool incluirCumplidos = true,
+    bool incluirEliminados = false,
+  }) async {
+    final fuera = [
+      if (!incluirCumplidos) "estado <> 'cumplido'",
+      if (!incluirEliminados) "estado <> 'eliminado'",
+    ];
+
     final filas = await _db.query(
       'recordatorios',
-      where: incluirCumplidos ? null : "estado <> 'cumplido'",
+      where: fuera.isEmpty ? null : fuera.join(' AND '),
       orderBy: 'fecha ASC, id ASC',
     );
     return filas.map(Recordatorio.fromRow).toList();
@@ -91,12 +99,16 @@ class RecordatoriosRepositorySqlite implements RecordatoriosRepository {
 
     // Reprogramar un vencido para más adelante lo devuelve a pendiente, o
     // seguiría contando en el aviso rojo con una fecha que ya no vencía.
-    // Los cumplidos no cambian de estado nunca: ese estado es final.
-    if (anterior != null && !anterior.cumplido) {
+    // Cumplido y eliminado no cambian nunca: son estados finales.
+    if (anterior != null) {
       registro = registro.copyWith(
-        estado: estaVencida(registro.fecha)
-            ? EstadoRecordatorio.vencido
-            : EstadoRecordatorio.pendiente,
+        cumplidoEl: anterior.cumplidoEl,
+        eliminadoEl: anterior.eliminadoEl,
+        estado: !anterior.activo
+            ? anterior.estado
+            : estaVencida(registro.fecha)
+                ? EstadoRecordatorio.vencido
+                : EstadoRecordatorio.pendiente,
       );
     }
 
@@ -106,8 +118,56 @@ class RecordatoriosRepositorySqlite implements RecordatoriosRepository {
 
   @override
   Future<void> eliminar(int id) async {
-    await _db.delete('recordatorios', where: 'id = ?', whereArgs: [id]);
+    final actual = await obtener(id);
+    if (actual == null || !actual.activo) return;
+
+    await _db.update(
+      'recordatorios',
+      {
+        'estado': EstadoRecordatorio.eliminado.name,
+        'eliminadoEl': hoyISO(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
+
+  @override
+  Future<int?> eliminarYSeguir(int id) async {
+    final actual = await obtener(id);
+    if (actual == null || !actual.activo) return null;
+
+    await eliminar(id);
+    return actual.seRepite ? _crearSiguiente(actual) : null;
+  }
+
+  @override
+  Future<void> dejarDeRepetir(int id) async {
+    await _db.update(
+      'recordatorios',
+      {'repetirCada': null, 'repetirUnidad': null, 'repetirMeses': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  @override
+  Future<void> borrarParaSiempre(int id) async {
+    await _db.delete(
+      'recordatorios',
+      where: "id = ? AND estado = 'eliminado'",
+      whereArgs: [id],
+    );
+  }
+
+  /// El siguiente cuenta desde la fecha programada, no desde hoy: un
+  /// mantenimiento atendido tarde no corre todo el calendario hacia adelante.
+  Future<int> _crearSiguiente(Recordatorio actual) => crear(
+        actual.copyWith(
+          fecha: actual.repite!.siguiente(actual.fecha),
+          estado: EstadoRecordatorio.pendiente,
+        ),
+      );
 
   @override
   Future<void> marcarImportante(int id, bool importante) async {
@@ -122,24 +182,19 @@ class RecordatoriosRepositorySqlite implements RecordatoriosRepository {
   @override
   Future<int?> marcarCumplido(int id) async {
     final actual = await obtener(id);
-    if (actual == null || actual.cumplido) return null;
+    if (actual == null || !actual.activo) return null;
 
     await _db.update(
       'recordatorios',
-      {'estado': EstadoRecordatorio.cumplido.name},
+      {
+        'estado': EstadoRecordatorio.cumplido.name,
+        'cumplidoEl': hoyISO(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
 
-    if (!actual.seRepite) return null;
-
-    // El siguiente cuenta desde la fecha programada, no desde hoy: un
-    // mantenimiento atendido tarde no corre todo el calendario hacia adelante.
-    return crear(actual.copyWith(
-      id: null,
-      fecha: actual.repite!.siguiente(actual.fecha),
-      estado: EstadoRecordatorio.pendiente,
-    ));
+    return actual.seRepite ? _crearSiguiente(actual) : null;
   }
 
   @override

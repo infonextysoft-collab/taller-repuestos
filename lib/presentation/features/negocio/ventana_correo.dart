@@ -163,8 +163,6 @@ class _VincularState extends ConsumerState<_Vincular> {
         titulo: '¿Está bien escrito?',
         mensaje: '$correo\n\nA esta dirección van a llegar los enlaces para '
             'recuperar la contraseña.',
-        aceptar: 'Sí, vincular',
-        cancelar: 'Corregir',
       );
       if (!bien || !mounted) return;
       _confirmado = correo;

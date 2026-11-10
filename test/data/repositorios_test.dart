@@ -137,6 +137,26 @@ void main() {
       expect(await inventario.codigoRepetido('0000000000000'), isFalse);
     });
 
+    test('el mismo código escrito de otra forma también es repetido', () async {
+      final id = await inventario.crear(
+        const Repuesto(nombre: 'Filtro', codigoBarras: '036000291452'),
+      );
+      await inventario.crear(
+        const Repuesto(nombre: 'Banda', codigoBarras: 'abc-77'),
+      );
+
+      // Con el 0 de adelante, como lo lee un EAN-13.
+      expect((await inventario.buscarPorCodigo('0036000291452'))?.id, id);
+      expect(await inventario.codigoRepetido('0036000291452'), isTrue);
+      // El propio no cuenta como repetido.
+      expect(
+        await inventario.codigoRepetido('0036000291452', exceptoId: id),
+        isFalse,
+      );
+      expect(await inventario.codigoRepetido('ABC-77'), isTrue);
+      expect(await inventario.codigoRepetido('036000291453'), isFalse);
+    });
+
     test('varios repuestos pueden quedar sin código', () async {
       // Un código vacío se guarda como NULL, y SQLite deja pasar varios NULL
       // en un índice único.
@@ -251,6 +271,146 @@ void main() {
       expect(await recordatorios.contarVencidos(), 1);
       expect((await recordatorios.obtener(vencido))!.estado,
           EstadoRecordatorio.vencido);
+    });
+
+    test('cumplir guarda el día en que se marcó', () async {
+      final id = await recordatorios
+          .crear(const Recordatorio(descripcion: 'Aceite', fecha: '2026-01-10'));
+      await recordatorios.marcarCumplido(id);
+
+      expect((await recordatorios.obtener(id))!.cumplidoEl, hoyISO());
+    });
+
+    test('el siguiente de uno repetido nace sin marcas del anterior', () async {
+      final id = await recordatorios.crear(const Recordatorio(
+        descripcion: 'Aceite',
+        fecha: '2026-01-10',
+        repite: Repeticion.meses(1),
+      ));
+      final siguienteId = await recordatorios.marcarCumplido(id);
+
+      final siguiente = await recordatorios.obtener(siguienteId!);
+      expect(siguiente!.cumplidoEl, isNull);
+      expect(siguiente.activo, isTrue);
+    });
+
+    group('eliminar', () {
+      test('no borra: pasa al historial con su día', () async {
+        final id = await recordatorios.crear(
+          const Recordatorio(descripcion: 'Filtro', fecha: '2026-01-10'),
+        );
+        await recordatorios.eliminar(id);
+
+        final r = await recordatorios.obtener(id);
+        expect(r!.eliminado, isTrue);
+        expect(r.eliminadoEl, hoyISO());
+      });
+
+      test('un eliminado no aparece en lista ni en el número rojo', () async {
+        final id = await recordatorios.crear(
+          const Recordatorio(descripcion: 'Filtro', fecha: '2026-01-10'),
+        );
+        expect(await recordatorios.contarVencidos(), 1);
+
+        await recordatorios.eliminar(id);
+
+        expect(await recordatorios.contarVencidos(), 0);
+        expect(await recordatorios.listar(), isEmpty);
+        expect((await recordatorios.listar(incluirEliminados: true)).length, 1);
+      });
+
+      test('eliminar uno repetido no programa el siguiente', () async {
+        final id = await recordatorios.crear(const Recordatorio(
+          descripcion: 'Filtro',
+          fecha: '2026-01-10',
+          repite: Repeticion.meses(1),
+        ));
+        await recordatorios.eliminar(id);
+
+        expect(await recordatorios.listar(), isEmpty);
+      });
+
+      test('eliminar solo este deja programado el siguiente', () async {
+        final id = await recordatorios.crear(const Recordatorio(
+          descripcion: 'Filtro',
+          fecha: '2026-01-10',
+          repite: Repeticion.meses(1),
+        ));
+
+        final siguienteId = await recordatorios.eliminarYSeguir(id);
+
+        expect((await recordatorios.obtener(id))!.eliminado, isTrue);
+        final siguiente = await recordatorios.obtener(siguienteId!);
+        expect(siguiente!.fecha, '2026-02-10');
+        expect(siguiente.eliminadoEl, isNull);
+        expect(siguiente.seRepite, isTrue);
+      });
+
+      test('dejar de repetir lo deja donde está y no nace otro', () async {
+        final id = await recordatorios.crear(const Recordatorio(
+          descripcion: 'Filtro',
+          fecha: '2026-01-10',
+          repite: Repeticion.meses(1),
+        ));
+
+        await recordatorios.dejarDeRepetir(id);
+
+        final r = await recordatorios.obtener(id);
+        expect(r!.activo, isTrue);
+        expect(r.seRepite, isFalse);
+        expect(await recordatorios.marcarCumplido(id), isNull);
+      });
+
+      test('un cumplido no se puede eliminar', () async {
+        final id = await recordatorios.crear(
+          const Recordatorio(descripcion: 'Filtro', fecha: '2026-01-10'),
+        );
+        await recordatorios.marcarCumplido(id);
+        await recordatorios.eliminar(id);
+
+        expect((await recordatorios.obtener(id))!.cumplido, isTrue);
+      });
+
+      test('un eliminado no se puede cumplir', () async {
+        final id = await recordatorios.crear(
+          const Recordatorio(descripcion: 'Filtro', fecha: '2026-01-10'),
+        );
+        await recordatorios.eliminar(id);
+        await recordatorios.marcarCumplido(id);
+
+        expect((await recordatorios.obtener(id))!.eliminado, isTrue);
+      });
+
+      test('editar un eliminado no lo revive', () async {
+        final id = await recordatorios.crear(
+          const Recordatorio(descripcion: 'Filtro', fecha: '2026-01-10'),
+        );
+        await recordatorios.eliminar(id);
+
+        await recordatorios.actualizar(
+          (await recordatorios.obtener(id))!.copyWith(fecha: '2030-01-01'),
+        );
+
+        final r = await recordatorios.obtener(id);
+        expect(r!.eliminado, isTrue);
+        expect(r.eliminadoEl, hoyISO());
+      });
+
+      test('borrar para siempre solo actúa sobre los eliminados', () async {
+        final activo = await recordatorios.crear(
+          const Recordatorio(descripcion: 'Sigue', fecha: '2026-01-10'),
+        );
+        final ida = await recordatorios.crear(
+          const Recordatorio(descripcion: 'Se va', fecha: '2026-01-10'),
+        );
+        await recordatorios.eliminar(ida);
+
+        await recordatorios.borrarParaSiempre(activo);
+        await recordatorios.borrarParaSiempre(ida);
+
+        expect(await recordatorios.obtener(activo), isNotNull);
+        expect(await recordatorios.obtener(ida), isNull);
+      });
     });
 
     test('un cumplido nunca vuelve atrás', () async {

@@ -6,14 +6,13 @@ import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/dinero.dart';
 import '../../../core/utils/fechas.dart';
-import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/contenido.dart';
 import '../../../core/widgets/foto.dart';
 import '../../../core/widgets/hoja.dart';
 import '../../../domain/entities/trabajo.dart';
 import '../../../domain/repositories/trabajos_repository.dart';
 import '../../../domain/services/ganancia.dart';
-import '../../comunes/salida_pdf.dart';
+import '../../comunes/elegir_documentos.dart';
 import '../shell/barra_inferior.dart';
 import '../documento/pantalla_documento.dart';
 import '../trabajo/wizard_trabajo.dart';
@@ -195,22 +194,14 @@ class _PantallaHistorialState extends ConsumerState<PantallaHistorial> {
   }
 
   /// Descargar lo deja en el teléfono; compartir abre la hoja del sistema.
+  ///
+  /// Se vuelve a leer el registro porque la lista viene sin fotos, para no
+  /// cargarlas todas de golpe: con la fila tal cual, el PDF salía sin ellas.
   Future<void> _sacarPdf(Trabajo t, {required bool compartir}) async {
-    try {
-      final negocio = ref.read(negocioProvider);
-      final bytes = await ref.read(generadorPdfProvider).completo(t, negocio);
-      final nombre = '${t.codigo}.pdf';
+    final completo = await ref.read(trabajosRepoProvider).obtener(t.id!);
+    if (completo == null || !mounted) return;
 
-      if (compartir) {
-        await compartirPdf(bytes, nombre, mensaje: mensajeDeEnvio(t, negocio));
-      } else if (mounted) {
-        await descargarPdf(context, bytes, nombre);
-      }
-    } catch (e) {
-      if (mounted) {
-        mostrarAviso(context, 'No se pudo sacar el PDF: $e', problema: true);
-      }
-    }
+    await sacarDocumentos(context, ref, completo, compartir: compartir);
   }
 
   /* ---------------------------------------------------------------- vista */

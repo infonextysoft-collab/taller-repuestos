@@ -109,6 +109,21 @@ class Valida {
         return null;
       };
 
+  /// El descuento de una línea, en porcentaje. Vacío es 0, no un error.
+  ///
+  /// Se corta en 100: más que eso sería devolverle plata al cliente, y nadie
+  /// escribe 120 queriendo decir eso.
+  static Validador porcentaje() => (valor) {
+        final v = (valor ?? '').trim();
+        if (v.isEmpty) return null;
+
+        final numero = double.tryParse(v.replaceAll(',', '.'));
+        if (numero == null) return 'Escribe solo números.';
+        if (numero < 0) return 'No puede ser negativo.';
+        if (numero > 100) return 'Como mucho 100 %.';
+        return null;
+      };
+
   /// Un descuento no puede superar lo que se está cobrando.
   static Validador descuento(double Function() subtotal) => (valor) {
         final v = (valor ?? '').trim();

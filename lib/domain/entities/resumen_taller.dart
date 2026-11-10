@@ -47,12 +47,12 @@ class ResumenTaller {
     final hoy = hoyISO();
 
     final vencenHoy = recordatorios
-        .where((r) => !r.cumplido && r.fecha.compareTo(hoy) <= 0)
+        .where((r) => r.activo && r.fecha.compareTo(hoy) <= 0)
         .toList()
       ..sort((a, b) => a.fecha.compareTo(b.fecha));
 
     final futuros = recordatorios
-        .where((r) => !r.cumplido && r.fecha.compareTo(hoy) > 0)
+        .where((r) => r.activo && r.fecha.compareTo(hoy) > 0)
         .map((r) => r.fecha)
         .toList()
       ..sort();

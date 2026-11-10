@@ -39,12 +39,18 @@ void mostrarAviso(
 
 /// Confirmación de dos salidas. Devuelve `true` si el usuario eligió la
 /// acción principal.
+///
+/// Los dos botones dicen siempre **Aceptar** y **Cancelar**, en todas las
+/// pantallas. El título ya dice qué va a pasar —"¿Eliminar Filtro de
+/// aceite?"—, así que rotular el botón con el verbo de cada caso obligaba a
+/// leer tres textos distintos para entender lo mismo. Con el par de siempre
+/// se reconoce cuál es cuál sin leer.
 Future<bool> confirmar(
   BuildContext context, {
   required String titulo,
   required String mensaje,
-  String aceptar = 'Continuar',
-  String cancelar = 'Permanecer',
+  String aceptar = 'Aceptar',
+  String cancelar = 'Cancelar',
   bool destructivo = false,
 }) async {
   final respuesta = await showDialog<bool>(
@@ -104,7 +110,7 @@ Future<SalidaWizard> confirmarSalida(BuildContext context) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(SalidaWizard.permanecer),
-          child: const Text('Permanecer'),
+          child: const Text('Cancelar'),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(SalidaWizard.guardar),

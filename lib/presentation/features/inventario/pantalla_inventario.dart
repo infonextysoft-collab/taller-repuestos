@@ -14,6 +14,7 @@ import '../../../domain/entities/repuesto.dart';
 import '../../comunes/filtro_chips.dart';
 import 'formulario_repuesto.dart';
 import 'hoja_repuesto.dart';
+import 'pantalla_actualizar_stock.dart';
 
 enum _FiltroStock { todos, conStock, agotados }
 
@@ -91,6 +92,23 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
     }
   }
 
+  /// Corregir varios conteos de una pasada, sin entrar a editar uno por uno.
+  Future<void> _actualizarStock() async {
+    final guardados = await Navigator.of(context).push<int>(
+      MaterialPageRoute(builder: (_) => const PantallaActualizarStock()),
+    );
+    if (!mounted || guardados == null || guardados == 0) return;
+
+    await _cargar();
+    if (!mounted) return;
+    mostrarAviso(
+      context,
+      guardados == 1
+          ? 'Se actualizó 1 repuesto.'
+          : 'Se actualizaron $guardados repuestos.',
+    );
+  }
+
   Future<void> _buscarPorCodigo() async {
     final codigo = await escanearCodigo(context, titulo: 'Buscar por código');
     if (codigo == null || !mounted) return;
@@ -111,8 +129,6 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
       titulo: '¿Eliminar ${r.nombre}?',
       mensaje: 'Sale del inventario. Los trabajos que ya lo tenían cargado no '
           'cambian.',
-      aceptar: 'Eliminar',
-      cancelar: 'Permanecer',
       destructivo: true,
     );
     if (!seguro) return;
@@ -227,6 +243,17 @@ class _PantallaInventarioState extends ConsumerState<PantallaInventario> {
                         ),
                       ],
                     ),
+                    // Contar el almacén y corregir los números es una tarea
+                    // aparte de vender: va rotulada y arriba, no escondida
+                    // adentro del formulario de cada repuesto.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: _actualizarStock,
+                        icon: const Icon(Icons.checklist_rounded, size: 18),
+                        label: const Text('Actualizar stock'),
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -311,7 +338,7 @@ class _FilaRepuesto extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(r.nombre, style: Tipo.encabezado),
+                Text(r.nombre.toUpperCase(), style: Tipo.encabezado),
                 const SizedBox(height: 5),
                 Row(
                   children: [
