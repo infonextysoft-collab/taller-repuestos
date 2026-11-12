@@ -168,6 +168,58 @@ void main() {
     });
   });
 
+  group('facturar a', () {
+    Future<int> registrar(
+      String cliente,
+      String facturarA,
+      String fecha, {
+      String ruc = '',
+      TipoTrabajo tipo = TipoTrabajo.taller,
+    }) async {
+      final t = await trabajos.crear(Trabajo(
+        tipo: tipo,
+        fecha: fecha,
+        cliente: cliente,
+        facturarA: facturarA,
+        ruc: ruc,
+      ));
+      return t.id!;
+    }
+
+    test('sugiere las tres últimas empresas, sin repetir', () async {
+      await registrar('Ana', 'Constructora Andina', '2026-01-01');
+      await registrar('Beto', 'Minera Sur', '2026-02-01');
+      await registrar('Ana', 'CONSTRUCTORA ANDINA', '2026-03-01');
+      await registrar('Ciro', 'Transportes Lima', '2026-04-01');
+      await registrar('Dora', 'Agrícola Norte', '2026-05-01',
+          ruc: '20601234567');
+
+      final recientes = await trabajos.facturadosRecientes();
+
+      expect(recientes.map((f) => f.nombre),
+          ['Agrícola Norte', 'Transportes Lima', 'CONSTRUCTORA ANDINA']);
+      expect(recientes.first.ruc, '20601234567');
+    });
+
+    test('lo vacío y la venta simple no son empresas aparte', () async {
+      await registrar('Ana', '', '2026-01-01');
+      await registrar('Mostrador', 'Mostrador', '2026-02-01',
+          tipo: TipoTrabajo.venta);
+
+      expect(await trabajos.facturadosRecientes(), isEmpty);
+    });
+
+    test('el registro que se está editando no se sugiere a sí mismo', () async {
+      await registrar('Ana', 'Minera Sur', '2026-01-01');
+      final propio = await registrar('Beto', 'Mine', '2026-02-01');
+
+      final recientes =
+          await trabajos.facturadosRecientes(exceptoId: propio);
+
+      expect(recientes.map((f) => f.nombre), ['Minera Sur']);
+    });
+  });
+
   group('pasos guardados', () {
     test('guardar en el paso 6 cierra del 1 al 6', () async {
       final t = await trabajos.crear(const Trabajo(fecha: '2026-03-04'));

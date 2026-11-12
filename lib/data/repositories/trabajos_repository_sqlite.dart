@@ -22,8 +22,12 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
 
   @override
   Future<Trabajo?> obtener(int id) async {
-    final filas =
-        await _db.query('trabajos', where: 'id = ?', whereArgs: [id], limit: 1);
+    final filas = await _db.query(
+      'trabajos',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
     if (filas.isEmpty) return null;
 
     // Al abrir un registro sí se traen las fotos completas: se van a ver en el
@@ -110,8 +114,12 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
         final id = await _db.insert('fotos', foto.toRow(trabajoId, momento, i));
         guardadas.add(foto.copyWith(id: id));
       } else {
-        await _db.update('fotos', {'orden': i},
-            where: 'id = ?', whereArgs: [foto.id]);
+        await _db.update(
+          'fotos',
+          {'orden': i},
+          where: 'id = ?',
+          whereArgs: [foto.id],
+        );
         guardadas.add(foto);
       }
     }
@@ -155,16 +163,18 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
     final encontrados = busqueda.isEmpty
         ? registros.toList()
         : registros
-            .where((t) =>
-                coincide(t.cliente, busqueda) || coincide(t.equipo, busqueda))
-            .toList();
+              .where(
+                (t) =>
+                    coincide(t.cliente, busqueda) ||
+                    coincide(t.equipo, busqueda),
+              )
+              .toList();
 
-    final minis =
-        await _miniaturas(encontrados.map((t) => t.id).whereType<int>().toList());
+    final minis = await _miniaturas(
+      encontrados.map((t) => t.id).whereType<int>().toList(),
+    );
 
-    return [
-      for (final t in encontrados) t.copyWith(miniatura: minis[t.id]),
-    ];
+    return [for (final t in encontrados) t.copyWith(miniatura: minis[t.id])];
   }
 
   /// Correlativo por tipo y por año: `REP-2026-0001` / `VTA-2026-0001`.
@@ -172,7 +182,10 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
   /// Se calcula **dentro de la transacción del alta**, o dos registros creados
   /// seguidos se quedan con el mismo número.
   Future<String> _siguienteCodigo(
-      DatabaseExecutor txn, TipoTrabajo tipo, String fecha) async {
+    DatabaseExecutor txn,
+    TipoTrabajo tipo,
+    String fecha,
+  ) async {
     final anio = (fecha.isEmpty ? hoyISO() : fecha).substring(0, 4);
     final inicio = '${tipo.prefijoCodigo}-$anio-';
 
@@ -188,10 +201,10 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
     final correlativo = filas.isEmpty
         ? 1
         : (int.tryParse(
-                  filas.first['codigo'].toString().substring(inicio.length),
-                ) ??
-                0) +
-            1;
+                    filas.first['codigo'].toString().substring(inicio.length),
+                  ) ??
+                  0) +
+              1;
 
     return '$inicio${correlativo.toString().padLeft(4, '0')}';
   }
@@ -229,14 +242,24 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
       totales: calculadora.calcular(trabajo),
     );
 
-    await _db.update('trabajos', registro.toRow()..remove('id'),
-        where: 'id = ?', whereArgs: [registro.id]);
+    await _db.update(
+      'trabajos',
+      registro.toRow()..remove('id'),
+      where: 'id = ?',
+      whereArgs: [registro.id],
+    );
 
     return registro.copyWith(
       fotosIngreso: await _guardarFotos(
-          registro.id!, MomentoFoto.ingreso, registro.fotosIngreso),
+        registro.id!,
+        MomentoFoto.ingreso,
+        registro.fotosIngreso,
+      ),
       fotosEntrega: await _guardarFotos(
-          registro.id!, MomentoFoto.entrega, registro.fotosEntrega),
+        registro.id!,
+        MomentoFoto.entrega,
+        registro.fotosEntrega,
+      ),
     );
   }
 
@@ -247,9 +270,10 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
 
     // Marca 1..paso, no solo el último: estar en el paso 6 y guardar no puede
     // perder lo anterior.
-    final pasos = {...actual.pasosGuardados, for (var p = 1; p <= paso; p++) p}
-        .toList()
-      ..sort();
+    final pasos = {
+      ...actual.pasosGuardados,
+      for (var p = 1; p <= paso; p++) p,
+    }.toList()..sort();
 
     return actualizar(actual.copyWith(pasosGuardados: pasos));
   }
@@ -268,6 +292,38 @@ class TrabajosRepositorySqlite implements TrabajosRepository {
     final actual = await obtener(id);
     if (actual == null) throw StateError('No existe el registro $id');
     return actualizar(actual.copyWith(estado: EstadoTrabajo.terminado));
+  }
+
+  @override
+  Future<List<Facturado>> facturadosRecientes({
+    int limite = 3,
+    int? exceptoId,
+  }) async {
+    final filas = await _db.query(
+      'trabajos',
+      columns: ['cliente', 'facturarA', 'ruc'],
+      where: "TRIM(facturarA) <> ''${exceptoId == null ? '' : ' AND id <> ?'}",
+      whereArgs: exceptoId == null ? null : [exceptoId],
+      orderBy: 'fecha DESC, id DESC',
+    );
+
+    final vistos = <String>{};
+    final salida = <Facturado>[];
+
+    for (final fila in filas) {
+      final nombre = (fila['facturarA'] ?? '').toString().trim();
+      final clave = normalizar(nombre);
+
+      // La venta simple copia el cliente en "Facturar a": eso no es una
+      // empresa aparte, es el mismo nombre dos veces.
+      if (clave == normalizar(fila['cliente']?.toString())) continue;
+      if (!vistos.add(clave)) continue;
+
+      salida.add((nombre: nombre, ruc: (fila['ruc'] ?? '').toString().trim()));
+      if (salida.length == limite) break;
+    }
+
+    return salida;
   }
 
   @override

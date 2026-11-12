@@ -170,9 +170,9 @@ ahí se decide qué implementación concreta cumple cada contrato. Y
 - **Un código de barras es de un solo repuesto**, y se revisa al escanearlo o
   escribirlo, no al guardar. Se comparan sin mayúsculas y sin el cero de
   adelante del EAN-13, que un lector pone y otro no.
-- **El RUC puede venir fijo desde la compilación** y entonces no se puede
-  cambiar en la app, ni restaurando un respaldo. Va en un archivo privado que
-  Git ignora: este repositorio es público.
+- **"Facturar a" sugiere las tres últimas empresas usadas**, leyendo los
+  trabajos ya guardados. Al elegir una, si el RUC / DNI está vacío se completa
+  con el RUC que tuvo esa empresa la última vez.
 
 Todo eso está cubierto por tests: `flutter test`.
 
@@ -260,13 +260,8 @@ Chrome para mirar.
 ### El APK
 
 ```bash
-flutter build apk --release --dart-define-from-file=config_privada.json
+flutter build apk --release
 ```
-
-`config_privada.json` lleva el RUC fijo y **no se sube a Git**. Para crearlo, se
-copia `config_privada.example.json` y se llena. Sin ese archivo se compila igual
-quitando `--dart-define-from-file`, y el RUC se escribe a mano en la app. La
-versión web se publica siempre sin él.
 
 Queda en `build/app/outputs/flutter-apk/app-release.apk`. En Windows,
 `android/gradle.properties` apaga la compilación incremental de Kotlin: con ella

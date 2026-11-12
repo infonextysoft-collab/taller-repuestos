@@ -1,5 +1,8 @@
 import '../entities/trabajo.dart';
 
+/// Una empresa a la que ya se le facturó, con el RUC que llevó esa vez.
+typedef Facturado = ({String nombre, String ruc});
+
 /// Los cuatro filtros del Historial. Vacío = sin filtrar.
 class FiltroHistorial {
   const FiltroHistorial({
@@ -27,13 +30,12 @@ class FiltroHistorial {
     String? busqueda,
     TipoTrabajo? tipo,
     bool quitarTipo = false,
-  }) =>
-      FiltroHistorial(
-        desde: desde ?? this.desde,
-        hasta: hasta ?? this.hasta,
-        busqueda: busqueda ?? this.busqueda,
-        tipo: quitarTipo ? null : (tipo ?? this.tipo),
-      );
+  }) => FiltroHistorial(
+    desde: desde ?? this.desde,
+    hasta: hasta ?? this.hasta,
+    busqueda: busqueda ?? this.busqueda,
+    tipo: quitarTipo ? null : (tipo ?? this.tipo),
+  );
 }
 
 /// Contrato de la capa de datos para ventas y trabajos.
@@ -44,7 +46,9 @@ abstract class TrabajosRepository {
   Future<Trabajo?> obtener(int id);
 
   /// Más reciente primero; a igual fecha, el último registrado arriba.
-  Future<List<Trabajo>> listar([FiltroHistorial filtro = const FiltroHistorial()]);
+  Future<List<Trabajo>> listar([
+    FiltroHistorial filtro = const FiltroHistorial(),
+  ]);
 
   /// Crea el registro en estado `pendiente` con su correlativo, y devuelve el
   /// registro ya guardado (con id y código).
@@ -65,4 +69,11 @@ abstract class TrabajosRepository {
 
   /// Elimina el registro y devuelve al stock todas sus líneas de inventario.
   Future<void> eliminar(int id);
+
+  /// Las últimas [limite] empresas distintas a las que se facturó, de la más
+  /// reciente a la más vieja.
+  ///
+  /// [exceptoId] deja afuera el registro que se está editando: se guarda
+  /// mientras se escribe, y se sugeriría a sí mismo a medio escribir.
+  Future<List<Facturado>> facturadosRecientes({int limite = 3, int? exceptoId});
 }

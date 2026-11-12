@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/theme/tipografia.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/config/negocio_fijo.dart';
 import '../../../core/utils/validacion.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/campo.dart';
@@ -225,16 +224,8 @@ class _PantallaNegocioState extends ConsumerState<PantallaNegocio> {
                     etiqueta: 'RUC',
                     soloRuc: true,
                     obligatorio: true,
-                    habilitado: kRucFijo.isEmpty,
                     onCambio: (_) => setState(() => _hayCambios = true),
                   ),
-                  if (kRucFijo.isNotEmpty) ...[
-                    const SizedBox(height: Espacio.xs),
-                    Text(
-                      'El RUC viene fijo en la app y no se puede cambiar.',
-                      style: Tipo.nota,
-                    ),
-                  ],
                   const SizedBox(height: Espacio.lg),
                   Campo(
                     etiqueta: 'Dirección',

@@ -656,6 +656,26 @@ Future<void> _sembrar(AppDatabase db) async {
     cerrado: false,
   );
 
+  // Empresas a las que ya se facturó, para que el paso 1 las sugiera.
+  await db.db.update(
+    'trabajos',
+    {'facturarA': 'Constructora Andina SAC', 'ruc': '20601234567'},
+    where: 'cliente = ?',
+    whereArgs: ['Juan Ramírez'],
+  );
+  await db.db.update(
+    'trabajos',
+    {'facturarA': 'Minera Eco Pampa SAA'},
+    where: 'cliente = ?',
+    whereArgs: ['Minera Eco Pampa'],
+  );
+  await db.db.update(
+    'trabajos',
+    {'facturarA': 'Agrícola del Norte EIRL'},
+    where: 'cliente = ?',
+    whereArgs: ['Carmen Díaz'],
+  );
+
   await recordatorios.crear(const Recordatorio(
     descripcion: 'Cambiar filtro del compresor de Juan',
     fecha: '2026-09-09',

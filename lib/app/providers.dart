@@ -27,13 +27,13 @@ import '../domain/repositories/trabajos_repository.dart';
 
 /// Se resuelve en `main()`, cuando la base ya está abierta.
 final baseDatosProvider = Provider<AppDatabase>(
-  (ref) => throw UnimplementedError('Sobrescribir en main() con la base abierta'),
+  (ref) =>
+      throw UnimplementedError('Sobrescribir en main() con la base abierta'),
 );
 
 final inventarioRepoProvider = Provider<InventarioRepository>(
   (ref) => InventarioRepositorySqlite(ref.watch(baseDatosProvider)),
 );
-
 
 final trabajosRepoProvider = Provider<TrabajosRepository>(
   (ref) => TrabajosRepositorySqlite(
@@ -100,8 +100,7 @@ class NegocioNotifier extends StateNotifier<Negocio> {
   }
 }
 
-final negocioProvider =
-    StateNotifierProvider<NegocioNotifier, Negocio>(
+final negocioProvider = StateNotifierProvider<NegocioNotifier, Negocio>(
   (ref) => NegocioNotifier(ref.watch(negocioRepoProvider)),
 );
 
@@ -150,3 +149,13 @@ final refrescoInventarioProvider = StateProvider<int>((ref) => 0);
 
 /// Y para el historial.
 final refrescoHistorialProvider = StateProvider<int>((ref) => 0);
+
+/// Las últimas empresas a las que se facturó, para sugerirlas en el paso 1.
+/// El parámetro es el registro que se está editando, que no cuenta.
+final facturadosRecientesProvider = FutureProvider.autoDispose
+    .family<List<Facturado>, int?>((ref, exceptoId) {
+      ref.watch(refrescoHistorialProvider);
+      return ref
+          .watch(trabajosRepoProvider)
+          .facturadosRecientes(exceptoId: exceptoId);
+    });

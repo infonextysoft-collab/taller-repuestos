@@ -136,51 +136,45 @@ class _PantallaRecordatoriosState extends ConsumerState<PantallaRecordatorios> {
                       child: _Ficha(
                         titulo: 'Vencidos',
                         cantidad: vencidos.length,
-                        icono: Icons.error_outline_rounded,
+                        icono: Icons.warning_amber_rounded,
                         color: vencidos.isEmpty ? Tono.texto2 : Tono.vino,
-                        fondoIcono: vencidos.isEmpty ? Tono.fondo2 : Tono.fondo,
                         alerta: vencidos.isNotEmpty,
                         seleccionada: vista == _Vista.vencidos,
                         onTap: () => setState(() => _elegida = _Vista.vencidos),
                       ),
                     ),
-                    const SizedBox(width: Espacio.md),
+                    const SizedBox(width: Espacio.sm),
                     Expanded(
                       child: _Ficha(
                         titulo: 'Hoy',
                         cantidad: deHoy.length,
-                        icono: Icons.today_rounded,
-                        color: Tono.oro,
-                        fondoIcono: Tono.oroSuave,
+                        icono: Icons.calendar_today_outlined,
+                        color: Tono.texto2,
                         seleccionada: vista == _Vista.hoy,
                         onTap: () => setState(() => _elegida = _Vista.hoy),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: Espacio.md),
+                const SizedBox(height: Espacio.sm),
                 Row(
                   children: [
                     Expanded(
                       child: _Ficha(
                         titulo: 'Programados',
                         cantidad: _programados.length,
-                        icono: Icons.event_rounded,
+                        icono: Icons.schedule_rounded,
                         color: Tono.texto2,
-                        fondoIcono: Tono.fondo2,
-                        abrePantalla: true,
                         onTap: () => _abrir(const PantallaProgramados()),
                       ),
                     ),
-                    const SizedBox(width: Espacio.md),
+                    const SizedBox(width: Espacio.sm),
                     Expanded(
                       child: _Ficha(
                         titulo: 'Completados',
                         cantidad: cumplidosDelAnio(_todos, anio),
                         icono: Icons.check_circle_outline_rounded,
-                        color: Tono.texto2,
-                        fondoIcono: Tono.fondo2,
-                        abrePantalla: true,
+                        color: Tono.oro,
                         onTap: () => _abrir(const PantallaCompletados()),
                       ),
                     ),
@@ -227,95 +221,96 @@ class _PantallaRecordatoriosState extends ConsumerState<PantallaRecordatorios> {
   }
 }
 
-/// Una ficha grande: ícono redondo, número y nombre.
+/// El rosado de la ficha de vencidos: más cargado que el suave de las
+/// insignias, para que se vea desde lejos aunque no sea la elegida.
+const Color _rosaVencido = Color(0xFFF8E0DE);
+const Color _bordeVencido = Color(0xFFD98880);
+
+/// Fondo de la ficha elegida, cuando no es la de vencidos.
+const Color _fondoElegida = Color(0xFFEDE8DE);
+
+/// Una ficha: ícono chico arriba, número a la derecha y nombre abajo.
 ///
-/// El borde va siempre, transparente cuando no toca, para que el contenido no
-/// salte ni un punto al elegirla.
+/// Vencidos va siempre en rojo cuando tiene algo, esté elegida o no: es lo
+/// primero que hay que ver, y no puede parecerse a la de Hoy. La elegida se
+/// marca con un borde oscuro; en vencidos, el rojo se vuelve más fuerte.
+///
+/// El borde tiene siempre el mismo grosor, para que nada se mueva al elegir.
 class _Ficha extends StatelessWidget {
   const _Ficha({
     required this.titulo,
     required this.cantidad,
     required this.icono,
     required this.color,
-    required this.fondoIcono,
     required this.onTap,
     this.alerta = false,
     this.seleccionada = false,
-    this.abrePantalla = false,
   });
 
   final String titulo;
   final int cantidad;
   final IconData icono;
   final Color color;
-  final Color fondoIcono;
   final VoidCallback onTap;
   final bool alerta;
   final bool seleccionada;
-  final bool abrePantalla;
 
   @override
-  Widget build(BuildContext context) => Pulsable(
-    onTap: onTap,
-    escala: 0.97,
-    semantica: '$titulo, $cantidad',
-    child: AnimatedContainer(
-      duration: duracion(context, Movimiento.micro),
-      curve: Movimiento.salida,
-      padding: const EdgeInsets.all(Espacio.lg),
-      decoration: BoxDecoration(
-        color: alerta ? Tono.vinoSuave : Tono.fondo,
-        borderRadius: Redondeo.brNormal,
-        border: Border.all(
-          width: 2,
-          color: seleccionada
-              ? Tono.negro
-              : alerta
-              ? Tono.vinoBorde
-              : Colors.transparent,
+  Widget build(BuildContext context) {
+    final (fondo, borde) = alerta
+        ? (_rosaVencido, seleccionada ? Tono.vino : _bordeVencido)
+        : seleccionada
+        ? (_fondoElegida, Tono.negro)
+        : (Tono.fondo, Tono.lineaFuerte);
+
+    return Pulsable(
+      onTap: onTap,
+      escala: 0.97,
+      semantica: '$titulo, $cantidad',
+      child: AnimatedContainer(
+        duration: duracion(context, Movimiento.micro),
+        curve: Movimiento.salida,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: fondo,
+          borderRadius: Redondeo.brNormal,
+          border: Border.all(width: 1.5, color: borde),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: alerta ? const Color(0xFFF2C9C5) : Tono.fondo2,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icono, size: 18, color: color),
+                ),
+                const Spacer(),
+                Text(
+                  '$cantidad',
+                  style: Tipo.titulo1.copyWith(
+                    fontSize: 26,
+                    height: 1,
+                    fontFeatures: kNumerosTabulares,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Espacio.md),
+            Text(
+              titulo,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Tipo.encabezado.copyWith(fontSize: 14.5),
+            ),
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: fondoIcono,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icono, size: 23, color: color),
-              ),
-              const Spacer(),
-              if (abrePantalla)
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 24,
-                  color: Tono.texto3,
-                ),
-            ],
-          ),
-          const SizedBox(height: Espacio.md),
-          Text(
-            '$cantidad',
-            style: Tipo.titulo1.copyWith(
-              fontSize: 34,
-              height: 1.05,
-              fontFeatures: kNumerosTabulares,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            titulo,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Tipo.encabezado.copyWith(fontSize: 15),
-          ),
-        ],
-      ),
-    ),
-  );
+    );
+  }
 }

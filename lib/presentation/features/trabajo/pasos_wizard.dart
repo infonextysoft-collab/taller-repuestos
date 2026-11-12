@@ -21,6 +21,7 @@ import '../../comunes/controlador_registro.dart';
 import '../../comunes/galeria_fotos.dart';
 import '../../comunes/selector_repeticion.dart';
 import '../../comunes/selector_repuesto.dart';
+import 'sugerencias_facturar.dart';
 
 /// Los controladores de texto del wizard, en un solo lugar.
 ///
@@ -110,67 +111,65 @@ class PasoWizard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => switch (paso) {
-        1 => _ClienteEquipo(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
+    1 => _ClienteEquipo(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
 
-        // Las dos tandas de fotos son **una** pantalla. Es la misma acción con
-        // el celular en la mano, y separarlas dejaba dos pasos con dos botones
-        // cada uno y el resto en blanco.
-        2 => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _Fotos(
-                titulo: 'Cómo llegó el equipo',
-                detalle: 'Tómalas ahora, mientras lo tienes delante.',
-                fotos: ctrl.registro.fotosIngreso,
-                bloqueado: bloqueado,
-                onCambio: (f) =>
-                    ctrl.editar((t) => t.copyWith(fotosIngreso: f)),
-              ),
-              _Fotos(
-                titulo: 'Cómo quedó',
-                detalle: 'Es lo que respalda el trabajo si hay un reclamo.',
-                secundario: true,
-                fotos: ctrl.registro.fotosEntrega,
-                bloqueado: bloqueado,
-                onCambio: (f) =>
-                    ctrl.editar((t) => t.copyWith(fotosEntrega: f)),
-              ),
-            ],
-          ),
+    // Las dos tandas de fotos son **una** pantalla. Es la misma acción con
+    // el celular en la mano, y separarlas dejaba dos pasos con dos botones
+    // cada uno y el resto en blanco.
+    2 => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Fotos(
+          titulo: 'Cómo llegó el equipo',
+          detalle: 'Tómalas ahora, mientras lo tienes delante.',
+          fotos: ctrl.registro.fotosIngreso,
+          bloqueado: bloqueado,
+          onCambio: (f) => ctrl.editar((t) => t.copyWith(fotosIngreso: f)),
+        ),
+        _Fotos(
+          titulo: 'Cómo quedó',
+          detalle: 'Es lo que respalda el trabajo si hay un reclamo.',
+          secundario: true,
+          fotos: ctrl.registro.fotosEntrega,
+          bloqueado: bloqueado,
+          onCambio: (f) => ctrl.editar((t) => t.copyWith(fotosEntrega: f)),
+        ),
+      ],
+    ),
 
-        // Dónde fue y qué encontraste: lo que pasó con el equipo, junto.
-        3 => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _Lugar(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
-              _Diagnostico(
-                ctrl: ctrl,
-                campos: campos,
-                bloqueado: bloqueado,
-                secundario: true,
-              ),
-            ],
-          ),
+    // Dónde fue y qué encontraste: lo que pasó con el equipo, junto.
+    3 => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Lugar(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
+        _Diagnostico(
+          ctrl: ctrl,
+          campos: campos,
+          bloqueado: bloqueado,
+          secundario: true,
+        ),
+      ],
+    ),
 
-        // Mano de obra y repuestos contestan la misma pregunta —qué se cobra—
-        // y hasta ahora obligaban a cambiar de pantalla en el medio de armar
-        // el precio.
-        4 => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _ManoDeObra(ctrl: ctrl, bloqueado: bloqueado),
-              _Repuestos(
-                ctrl: ctrl,
-                bloqueado: bloqueado,
-                onAviso: onAviso,
-                secundario: true,
-              ),
-            ],
-          ),
+    // Mano de obra y repuestos contestan la misma pregunta —qué se cobra—
+    // y hasta ahora obligaban a cambiar de pantalla en el medio de armar
+    // el precio.
+    4 => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ManoDeObra(ctrl: ctrl, bloqueado: bloqueado),
+        _Repuestos(
+          ctrl: ctrl,
+          bloqueado: bloqueado,
+          onAviso: onAviso,
+          secundario: true,
+        ),
+      ],
+    ),
 
-        5 => _Recomendaciones(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
-        _ => _Totales(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
-      };
+    5 => _Recomendaciones(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
+    _ => _Totales(ctrl: ctrl, campos: campos, bloqueado: bloqueado),
+  };
 }
 
 /// Encabezado de paso: qué se está haciendo y por qué, en una línea.
@@ -191,28 +190,35 @@ class _Encabezado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(
-          top: secundario ? Espacio.xxl : 0,
-          bottom: Espacio.xl,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (secundario) ...[
-              const Divider(height: 1),
-              const SizedBox(height: Espacio.xl),
-            ],
-            Text(titulo, style: secundario ? Tipo.titulo2 : Tipo.titulo1),
-            if (detalle != null) ...[
-              const SizedBox(height: Espacio.sm),
-              Text(detalle!, style: Tipo.secundario),
-            ],
-          ],
-        ),
-      );
+    padding: EdgeInsets.only(
+      top: secundario ? Espacio.xxl : 0,
+      bottom: Espacio.xl,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (secundario) ...[
+          const Divider(height: 1),
+          const SizedBox(height: Espacio.xl),
+        ],
+        Text(titulo, style: secundario ? Tipo.titulo2 : Tipo.titulo1),
+        if (detalle != null) ...[
+          const SizedBox(height: Espacio.sm),
+          Text(detalle!, style: Tipo.secundario),
+        ],
+      ],
+    ),
+  );
 }
 
 /* ------------------------------------------------------------------ paso 1 */
+
+/// Pone un texto en el campo con el cursor al final, listo para seguir.
+void _poner(TextEditingController campo, String texto) =>
+    campo.value = TextEditingValue(
+      text: texto,
+      selection: TextSelection.collapsed(offset: texto.length),
+    );
 
 class _ClienteEquipo extends StatelessWidget {
   const _ClienteEquipo({
@@ -234,7 +240,8 @@ class _ClienteEquipo extends StatelessWidget {
       children: [
         const _Encabezado(
           titulo: '¿Para quién es el trabajo?',
-          detalle: 'Estos datos van impresos en el reporte y en la nota de venta.',
+          detalle:
+              'Estos datos van impresos en el reporte y en la nota de venta.',
         ),
         Campo(
           etiqueta: 'Cliente',
@@ -265,20 +272,36 @@ class _ClienteEquipo extends StatelessWidget {
           habilitado: !bloqueado,
           onCambio: (v) => ctrl.editar((r) => r.copyWith(facturarA: v)),
         ),
-        // Sin encabezado "Equipo": abajo va un campo que ya se llama "Qué
-        // equipo es". Dos etiquetas en mayúscula, una encima de la otra,
+        if (!bloqueado)
+          SugerenciasFacturar(
+            controlador: campos.facturarA,
+            exceptoId: t.id,
+            onElegir: (f) {
+              _poner(campos.facturarA, f.nombre);
+              ctrl.editar((r) => r.copyWith(facturarA: f.nombre));
+
+              // El RUC de esa empresa, si todavía no se escribió ninguno.
+              if (campos.ruc.text.trim().isEmpty &&
+                  RegExp(r'^\d{11}$').hasMatch(f.ruc)) {
+                _poner(campos.ruc, f.ruc);
+                ctrl.editar((r) => r.copyWith(ruc: f.ruc));
+              }
+            },
+          ),
+        // Sin encabezado "Vehículo": abajo va un campo que ya se llama "Tipo
+        // de vehículo". Dos etiquetas en mayúscula, una encima de la otra,
         // diciendo lo mismo, es ruido con forma de jerarquía.
         const SizedBox(height: Espacio.xxl),
         Seccion(
           child: Column(
             children: [
               Campo(
-                etiqueta: 'Qué equipo es',
+                etiqueta: 'Tipo de vehículo',
                 controlador: campos.equipo,
-                ejemplo: 'Ej. Motor trifásico 5 HP',
+                ejemplo: 'Ej. Excavadora, tractor, camioneta',
                 habilitado: !bloqueado,
                 textoAccion: TextInputAction.next,
-                validador: Valida.obligatorio('el equipo'),
+                validador: Valida.obligatorio('el tipo de vehículo'),
                 onCambio: (v) => ctrl.editar((r) => r.copyWith(equipo: v)),
               ),
               const SizedBox(height: Espacio.lg),
@@ -303,8 +326,7 @@ class _ClienteEquipo extends StatelessWidget {
                       habilitado: !bloqueado,
                       textoAccion: TextInputAction.next,
                       validador: Valida.obligatorio('la placa'),
-                      onCambio: (v) =>
-                          ctrl.editar((r) => r.copyWith(placa: v)),
+                      onCambio: (v) => ctrl.editar((r) => r.copyWith(placa: v)),
                     ),
                   ),
                   const SizedBox(width: Espacio.md),
@@ -340,7 +362,8 @@ class _ClienteEquipo extends StatelessWidget {
                 controlador: campos.vin,
                 ejemplo: 'LSJA36E31PZ042103',
                 opcional: true,
-                ayuda: 'Los tres opcionales salen impresos solo si los '
+                ayuda:
+                    'Los tres opcionales salen impresos solo si los '
                     'cargas.',
                 habilitado: !bloqueado,
                 onCambio: (v) => ctrl.editar((r) => r.copyWith(vin: v)),
@@ -380,20 +403,12 @@ class _Fotos extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Encabezado(
-            titulo: titulo,
-            detalle: detalle,
-            secundario: secundario,
-          ),
-          GaleriaFotos(
-            fotos: fotos,
-            bloqueado: bloqueado,
-            onCambio: onCambio,
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _Encabezado(titulo: titulo, detalle: detalle, secundario: secundario),
+      GaleriaFotos(fotos: fotos, bloqueado: bloqueado, onCambio: onCambio),
+    ],
+  );
 }
 
 /* ------------------------------------------------------------------ paso 4 */
@@ -424,13 +439,15 @@ class _Lugar extends StatelessWidget {
     campos.vueltas.text = '1';
     campos.precioVuelta.clear();
     campos.ubicacion.clear();
-    ctrl.editar((t) => t.copyWith(
-          tipo: tipo,
-          ubicacion: '',
-          movilidad: Movilidad.cliente,
-          vueltas: 0,
-          precioVuelta: 0,
-        ));
+    ctrl.editar(
+      (t) => t.copyWith(
+        tipo: tipo,
+        ubicacion: '',
+        movilidad: Movilidad.cliente,
+        vueltas: 0,
+        precioVuelta: 0,
+      ),
+    );
   }
 
   @override
@@ -453,8 +470,9 @@ class _Lugar extends StatelessWidget {
                 icono: Icons.handyman_rounded,
                 texto: 'En el taller',
                 activo: !esCampo,
-                onTap:
-                    bloqueado ? null : () => _cambiarTipo(TipoTrabajo.taller),
+                onTap: bloqueado
+                    ? null
+                    : () => _cambiarTipo(TipoTrabajo.taller),
               ),
             ),
             const SizedBox(width: Espacio.md),
@@ -494,7 +512,8 @@ class _Lugar extends StatelessWidget {
                     onTap: bloqueado
                         ? null
                         : () => ctrl.editar(
-                            (r) => r.copyWith(movilidad: Movilidad.propia)),
+                            (r) => r.copyWith(movilidad: Movilidad.propia),
+                          ),
                   ),
                 ),
                 const SizedBox(width: Espacio.md),
@@ -506,7 +525,8 @@ class _Lugar extends StatelessWidget {
                     onTap: bloqueado
                         ? null
                         : () => ctrl.editar(
-                            (r) => r.copyWith(movilidad: Movilidad.cliente)),
+                            (r) => r.copyWith(movilidad: Movilidad.cliente),
+                          ),
                   ),
                 ),
               ],
@@ -537,8 +557,9 @@ class _Lugar extends StatelessWidget {
                     etiqueta: 'Precio por vuelta',
                     controlador: campos.precioVuelta,
                     ejemplo: '0.00',
-                    teclado:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    teclado: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     formateadores: [decimalFormato],
                     habilitado: !bloqueado,
                     validador: Valida.precio(obligatorio: true),
@@ -591,34 +612,34 @@ class _Diagnostico extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Encabezado(
-            titulo: 'Qué encontraste',
-            detalle: 'Va tal cual en el reporte de trabajo.',
-            secundario: secundario,
-          ),
-          Campo(
-            etiqueta: 'Observaciones',
-            controlador: campos.observaciones,
-            ejemplo: 'Cómo llegó, qué contó el cliente',
-            lineas: 4,
-            opcional: true,
-            habilitado: !bloqueado,
-            onCambio: (v) => ctrl.editar((r) => r.copyWith(observaciones: v)),
-          ),
-          const SizedBox(height: Espacio.lg),
-          Campo(
-            etiqueta: 'Diagnóstico',
-            controlador: campos.diagnostico,
-            ejemplo: 'La falla que encontraste',
-            lineas: 4,
-            opcional: true,
-            habilitado: !bloqueado,
-            onCambio: (v) => ctrl.editar((r) => r.copyWith(diagnostico: v)),
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _Encabezado(
+        titulo: 'Qué encontraste',
+        detalle: 'Va tal cual en el reporte de trabajo.',
+        secundario: secundario,
+      ),
+      Campo(
+        etiqueta: 'Observaciones',
+        controlador: campos.observaciones,
+        ejemplo: 'Cómo llegó, qué contó el cliente',
+        lineas: 4,
+        opcional: true,
+        habilitado: !bloqueado,
+        onCambio: (v) => ctrl.editar((r) => r.copyWith(observaciones: v)),
+      ),
+      const SizedBox(height: Espacio.lg),
+      Campo(
+        etiqueta: 'Diagnóstico',
+        controlador: campos.diagnostico,
+        ejemplo: 'La falla que encontraste',
+        lineas: 4,
+        opcional: true,
+        habilitado: !bloqueado,
+        onCambio: (v) => ctrl.editar((r) => r.copyWith(diagnostico: v)),
+      ),
+    ],
+  );
 }
 
 /* ------------------------------------------------------------------ paso 6 */
@@ -631,22 +652,22 @@ class _ManoDeObra extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _Encabezado(
-            titulo: 'Qué trabajo hiciste',
-            detalle: 'Sin cantidad: un trabajo se cobra por lo que se acordó.',
-          ),
-          if (!bloqueado) AgregarManoDeObra(onAgregar: ctrl.agregarManoDeObra),
-          const SizedBox(height: Espacio.lg),
-          TablaItems(
-            items: ctrl.registro.trabajosRealizados,
-            mostrarCantidad: false,
-            vacio: 'Todavía no agregaste ningún trabajo.',
-            onEliminar: bloqueado ? null : ctrl.quitarManoDeObra,
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const _Encabezado(
+        titulo: 'Qué trabajo hiciste',
+        detalle: 'Sin cantidad: un trabajo se cobra por lo que se acordó.',
+      ),
+      if (!bloqueado) AgregarManoDeObra(onAgregar: ctrl.agregarManoDeObra),
+      const SizedBox(height: Espacio.lg),
+      TablaItems(
+        items: ctrl.registro.trabajosRealizados,
+        mostrarCantidad: false,
+        vacio: 'Todavía no agregaste ningún trabajo.',
+        onEliminar: bloqueado ? null : ctrl.quitarManoDeObra,
+      ),
+    ],
+  );
 }
 
 /* ------------------------------------------------------------------ paso 7 */
@@ -666,35 +687,35 @@ class _Repuestos extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Encabezado(
-            titulo: 'Qué repuestos usaste',
-            detalle: 'Busca y toca el + — el precio ya está puesto.',
-            secundario: secundario,
-          ),
-          if (!bloqueado)
-            SelectorRepuesto(
-              onAgregar: (lineas, aviso) {
-                ctrl.agregarRepuestos(lineas);
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _Encabezado(
+        titulo: 'Qué repuestos usaste',
+        detalle: 'Busca y toca el + — el precio ya está puesto.',
+        secundario: secundario,
+      ),
+      if (!bloqueado)
+        SelectorRepuesto(
+          onAgregar: (lineas, aviso) {
+            ctrl.agregarRepuestos(lineas);
+            if (aviso != null) onAviso(aviso);
+          },
+        ),
+      const SizedBox(height: Espacio.lg),
+      TablaItems(
+        items: ctrl.registro.repuestos,
+        mostrarOrigen: true,
+        vacio: 'Todavía no agregaste ningún repuesto.',
+        onEliminar: bloqueado ? null : ctrl.quitarRepuesto,
+        onCambiarCantidad: bloqueado
+            ? null
+            : (i, delta) async {
+                final aviso = await ctrl.cambiarCantidad(i, delta);
                 if (aviso != null) onAviso(aviso);
               },
-            ),
-          const SizedBox(height: Espacio.lg),
-          TablaItems(
-            items: ctrl.registro.repuestos,
-            mostrarOrigen: true,
-            vacio: 'Todavía no agregaste ningún repuesto.',
-            onEliminar: bloqueado ? null : ctrl.quitarRepuesto,
-            onCambiarCantidad: bloqueado
-                ? null
-                : (i, delta) async {
-                    final aviso = await ctrl.cambiarCantidad(i, delta);
-                    if (aviso != null) onAviso(aviso);
-                  },
-          ),
-        ],
-      );
+      ),
+    ],
+  );
 }
 
 /* ------------------------------------------------------------------ paso 8 */
@@ -761,10 +782,13 @@ class _Recomendaciones extends StatelessWidget {
                     activeThumbColor: Tono.vino,
                     onChanged: bloqueado
                         ? null
-                        : (activo) => ctrl.editar((r) => activo
-                            ? r.copyWith(
-                                recordatorio: const Repeticion.meses(6))
-                            : r.copyWith(quitarRecordatorio: true)),
+                        : (activo) => ctrl.editar(
+                            (r) => activo
+                                ? r.copyWith(
+                                    recordatorio: const Repeticion.meses(6),
+                                  )
+                                : r.copyWith(quitarRecordatorio: true),
+                          ),
                   ),
                 ],
               ),
@@ -776,9 +800,11 @@ class _Recomendaciones extends StatelessWidget {
                   desde: ctrl.registro.fecha.isEmpty
                       ? hoyISO()
                       : ctrl.registro.fecha,
-                  onCambio: (v) => ctrl.editar((r) => v == null
-                      ? r.copyWith(quitarRecordatorio: true)
-                      : r.copyWith(recordatorio: v)),
+                  onCambio: (v) => ctrl.editar(
+                    (r) => v == null
+                        ? r.copyWith(quitarRecordatorio: true)
+                        : r.copyWith(recordatorio: v),
+                  ),
                 ),
                 if (!hayTexto) ...[
                   const SizedBox(height: Espacio.md),
@@ -832,7 +858,8 @@ class _Totales extends StatelessWidget {
           opcional: true,
           teclado: const TextInputType.numberWithOptions(decimal: true),
           formateadores: [decimalFormato],
-          ayuda: 'En soles, sobre todo el trabajo. Se resta antes de '
+          ayuda:
+              'En soles, sobre todo el trabajo. Se resta antes de '
               'desagregar el IGV. Para rebajar una sola línea está su % Dto.',
           habilitado: !bloqueado,
           validador: Valida.descuento(() => ctrl.totales.subtotal),
@@ -851,8 +878,9 @@ class _Totales extends StatelessWidget {
                 activo: !separado,
                 onTap: bloqueado
                     ? null
-                    : () =>
-                        ctrl.editar((r) => r.copyWith(vistaDoc: VistaDoc.junto)),
+                    : () => ctrl.editar(
+                        (r) => r.copyWith(vistaDoc: VistaDoc.junto),
+                      ),
               ),
               const SizedBox(height: Espacio.md),
               _OpcionAncha(
@@ -862,8 +890,9 @@ class _Totales extends StatelessWidget {
                 activo: separado,
                 onTap: bloqueado
                     ? null
-                    : () => ctrl
-                        .editar((r) => r.copyWith(vistaDoc: VistaDoc.separado)),
+                    : () => ctrl.editar(
+                        (r) => r.copyWith(vistaDoc: VistaDoc.separado),
+                      ),
               ),
             ],
           ),
@@ -908,11 +937,7 @@ class _Opcion extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(
-            icono,
-            size: 26,
-            color: activo ? Tono.oroClaro : Tono.texto2,
-          ),
+          Icon(icono, size: 26, color: activo ? Tono.oroClaro : Tono.texto2),
           const SizedBox(height: Espacio.md),
           Text(
             texto,
@@ -982,8 +1007,11 @@ class _OpcionAncha extends StatelessWidget {
             ),
           ),
           if (activo)
-            const Icon(Icons.check_circle_rounded,
-                size: 20, color: Tono.oroClaro),
+            const Icon(
+              Icons.check_circle_rounded,
+              size: 20,
+              color: Tono.oroClaro,
+            ),
         ],
       ),
     );
